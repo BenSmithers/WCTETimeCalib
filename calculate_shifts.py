@@ -6,7 +6,7 @@ from WCTECalib.times import sample_balltime, second, BALL_ERR
 from copy import deepcopy
 
 def refit(noise, ball_err=  BALL_ERR):
-    from WCTECalib.geometry import df, N_CHAN, get_pmt_positions, N_MPMT
+    from WCTECalib.geometry_old import df, N_CHAN, get_pmt_positions, N_MPMT
 
 
     samples = []
@@ -35,7 +35,8 @@ def refit(noise, ball_err=  BALL_ERR):
     new_df["calc_offset"] = np.mean(samples , axis=0)
 
     new_df.to_csv(
-        os.path.join(os.path.dirname(__file__), "data","calculated_offsets.csv")
+        os.path.join(os.path.dirname(__file__), "data","calculated_offsets.csv"),
+        index=False
     )
     return ball_pos+ball_pos_err
 

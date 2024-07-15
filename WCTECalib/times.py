@@ -12,15 +12,17 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
         ball should be in meters 
     """
-    from WCTECalib.geometry import N_CHAN, N_MPMT, get_pmt_positions
-
+    from WCTECalib.geometry_old import N_CHAN, N_MPMT, get_pmt_positions
+    from copy import deepcopy
     import numpy as  np
     import pandas as pd 
     import os 
 
-    true_data = pd.read_csv(os.path.join(
+    faux_data = pd.read_csv(os.path.join(
         os.path.dirname(__file__), "..","data","offsets.csv"
     ))
+
+    true_data = deepcopy(faux_data)
 
     positions = get_pmt_positions()
 
@@ -51,7 +53,7 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
 def generate_offsets(offset=OFFSET_SCALE):
 
-    from WCTECalib.geometry import df, N_CHAN, N_MPMT
+    from WCTECalib.geometry_old import df, N_CHAN, N_MPMT
 
     import numpy as  np
     import os 
@@ -70,7 +72,8 @@ def generate_offsets(offset=OFFSET_SCALE):
     new_df["offsets"] = pert_times
 
     new_df.to_csv(
-        os.path.join(os.path.dirname(__file__), "..", "data","offsets.csv")
+        os.path.join(os.path.dirname(__file__), "..", "data","offsets.csv"),
+        index=False
     )
 
 
