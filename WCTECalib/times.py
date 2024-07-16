@@ -3,6 +3,55 @@
 """
 
 from WCTECalib.utils import *
+from WCTECalib.geometry import get_pmts_visible, get_led_positions, df
+from WCTECalib.geometry import N_CHAN, N_MPMT, get_pmt_positions
+from copy import deepcopy
+import numpy as  np
+import pandas as pd 
+import os 
+from math import exp 
+
+def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
+    """
+    Possible output from flashing LED number `led_no` 
+    at a brightness where the nearest LED would see on average 1 pe 
+
+    Returns a tuple with three arrays
+        0 - an array of IDs specifying specific PMTs 
+        1 - the times at which a pulse was seen in the PMT 
+        2 - the number of PEs in that PMT 
+    """
+    true_data = pd.read_csv(os.path.join(
+        os.path.dirname(__file__), "..","data","offsets.csv"
+    ))
+
+
+    
+
+    led_ar_pos = get_led_positions([led_no,])
+    led_pos = led_ar_pos[0]
+
+    # we get the positions of the PMTs that are visible
+    # and the distances to those PMTs 
+    keep = get_pmts_visible(led_no) # unique IDs! 
+    true_data = true_data[keep]
+    positions = get_pmt_positions(true_data["unique_id"])
+
+    distances = np.sqrt(np.sum((led_pos - positions)**2, axis=1))
+
+    true_times = second*distances*N_WATER/C + np.array(true_data["offsets"])
+    pert_times = np.random.randn(N_CHAN*N_MPMT)[keep]*noise + true_times
+
+    # now we need to decide which of these actually got a photon
+    dmin= np.min(distances)
+    munot = mu/exp(-dmin/ABS_LEN)
+    mueff = munot*np.exp(-distances/ABS_LEN)
+
+    m_sample = np.random.poisson(mueff)
+
+    keep_these = m_sample>0
+
+    return np.array(true_data["unique_id"])[keep_these], pert_times[keep_these], m_sample[keep_these]
 
 def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_err = BALL_ERR, diff_err=DIFFUSER_ERR):
     """
@@ -12,11 +61,8 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
         ball should be in meters 
     """
-    from WCTECalib.geometry_old import N_CHAN, N_MPMT, get_pmt_positions
-    from copy import deepcopy
-    import numpy as  np
-    import pandas as pd 
-    import os 
+    
+
 
     faux_data = pd.read_csv(os.path.join(
         os.path.dirname(__file__), "..","data","offsets.csv"
@@ -52,14 +98,6 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
  
 
 def generate_offsets(offset=OFFSET_SCALE):
-
-    from WCTECalib.geometry_old import df, N_CHAN, N_MPMT
-
-    import numpy as  np
-    import os 
-
-
-
     mpmt_offset_sample = np.random.rand(N_MPMT)*offset
     mpmt_offset_sample = np.repeat(mpmt_offset_sample, N_CHAN)
 
