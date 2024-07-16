@@ -12,6 +12,8 @@ DIFFUSER_ERR = 1*ns
 BALL_ERR = 2*mm 
 SAMPLE_SIZE = 8*ns
 
+ABS_LEN = 20 # meters 
+
 
 N_WATER = 1.33 
 ball_pos = np.array([0,0, 1.6])
