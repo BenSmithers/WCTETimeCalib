@@ -1,9 +1,8 @@
 from WCTECalib.times import generate_offsets, sample_balltime
-from WCTECalib.geometry import N_MPMT
+from WCTECalib.geometry_old import N_MPMT
 from WCTECalib.utils import C, N_WATER, set_axes_equal
 
-from recover_ball import ballfit
-from calculate_shifts import refit 
+from WCTECalib.fitting import fit_ball as ballfit 
 import numpy as np 
 from math import pi 
 import os 
@@ -69,10 +68,6 @@ sizes = 0.75*mean_err**2 + 0.2
 
 twosig = np.percentile(np.abs(mean_err), 68.2689492)
 threesig = np.percentile(np.abs(mean_err), 99.7300204)
-
-print(twosig)
-print(threesig)
-
 
 colors = get_color(np.abs(mean_err), 6, "RdBu")
 plt.fill_between([0, len(mean_err)], -threesig, threesig, label=r"3$\sigma$", color="green")

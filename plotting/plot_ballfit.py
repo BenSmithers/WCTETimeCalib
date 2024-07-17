@@ -1,9 +1,8 @@
 from WCTECalib.times import generate_offsets, sample_balltime
-from WCTECalib.geometry import N_MPMT
+from WCTECalib.geometry_old import N_MPMT
 from WCTECalib.utils import C, N_WATER, set_axes_equal
 
-from recover_ball import ballfit
-from calculate_shifts import refit 
+from WCTECalib.fitting import fit_ball as ballfit 
 import numpy as np 
 from math import pi 
 import os 

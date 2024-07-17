@@ -9,7 +9,7 @@
 """
 
 from WCTECalib.times import generate_offsets, sample_balltime, DIFFUSER_ERR, BALL_ERR, mm, ns
-from recover_ball import ballfit
+from WCTECalib.fitting import fit_ball as ballfit 
 from calculate_shifts import refit 
 import numpy as np 
 from math import pi 

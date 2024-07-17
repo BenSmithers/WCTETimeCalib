@@ -1,6 +1,5 @@
 
 from WCTECalib.times import generate_offsets, sample_balltime, DIFFUSER_ERR, BALL_ERR, mm, ns
-from recover_ball import ballfit
 from calculate_shifts import refit 
 from WCTECalib.utils import get_color
 
