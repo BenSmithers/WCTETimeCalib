@@ -42,8 +42,8 @@ def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
     true_times = second*distances*N_WATER/C + np.array(true_data["offsets"])
     pert_times = np.random.randn(N_CHAN*N_MPMT)[keep]*noise + true_times
 
-    # now we need to decide which of these actually got a photon
-    dmin= np.min(distances)
+    # normalize this around ~3m 
+    dmin= 3
     munot = mu/exp(-dmin/ABS_LEN)
     mueff = munot*np.exp(-distances/ABS_LEN)
 

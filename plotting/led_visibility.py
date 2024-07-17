@@ -11,7 +11,7 @@ import os
 import pandas as pd
 
 offsets = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","geometry.csv"))
-LED_NO = 0.0
+LED_NO = 130
 
 led_ar_pos = get_led_positions([LED_NO,])
 led_pos = led_ar_pos[0]
@@ -31,7 +31,7 @@ alphas[np.logical_not(keep)] = 0.1
 
 fig = plt.figure()
 ax = plt.axes(projection="3d")
-ax.scatter(offsets["X"], offsets["Y"], offsets["Z"],zorder=0, color=colors,)
+ax.scatter(offsets["X"][keep], offsets["Y"][keep], offsets["Z"][keep],zorder=0, color=colors[keep],)
 ax.scatter(led_pos[0], led_pos[1], led_pos[2], color='green', zorder=10, s=100, alpha=1)
 ax.scatter([],[],[], color='green', label="Visible")
 plt.legend()

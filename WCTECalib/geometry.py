@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd 
 from math import pi 
 import os 
-from WCTECalib.utils import set_axes_equal
-
+from WCTECalib.utils import set_axes_equal, C, N_WATER
+from Geometry.WCD import WCD
 N_CHAN = 19
-PMT_MAX = 60*pi/180
-LED_MAX = 60*pi/180
+PMT_MAX = 85*pi/180
+LED_MAX = 25*pi/180
 
 wcte = WCD("wcte", kind="WCTE")
 
@@ -59,8 +59,13 @@ else:
     _led_pos = []
     _led_dir = []
     _led_ids = []
+    _feeds = []
 
     for im, mpmt in enumerate(wcte.mpmts):
+        loc = mpmt.get_xy_points('design','feedthrough', wcte)
+        _feeds.append(loc)
+
+
         for iled in range(3):
             this_led = mpmt.leds[iled].get_placement('design', wcte)
             _led_pos.append(fix_cord(this_led["location"])/1000.)
@@ -83,7 +88,7 @@ else:
     _dirs = np.transpose(_dirs)
     _led_pos = np.transpose(_led_pos)
     _led_dir = np.transpose(_led_dir)
-
+    _feeds = np.transpose(_feeds)/1000
     N_MPMT = im+1
     print(N_MPMT)
 
@@ -134,6 +139,7 @@ if __name__=="__main__":
     fig = plt.figure()
     ax = plt.axes(projection="3d")
     ax.scatter(_positions[0], _positions[1], _positions[2])
+    #ax.scatter(_feeds[0], _feeds[1], _feeds[2],'green')
     ax.quiver(_led_pos[0], _led_pos[1], _led_pos[2],_led_dir[0], _led_dir[1], _led_dir[2],color='red', length=0.1, normalize=True)
     ax.set_xlabel("X [m]")#
     ax.set_ylabel("Y [m]")
@@ -164,7 +170,7 @@ def get_pmts_visible(led_id:int):
 
     keep = np.logical_and(pmt_light_angle<PMT_MAX, led_light_angle < LED_MAX)
  
-    return keep 
+    return keep#  df[keep]["unique_id"]
 
 
 def get_led_positions(ids=None):
@@ -253,5 +259,3 @@ def get_pmt_pos(_mPMT_id: int, _channel:int):
         filtered["Y"], 
         filtered["Z"]
     )
-
-
