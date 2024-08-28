@@ -17,6 +17,7 @@ colors = ["green", "blue", "red", "orange", 'purple', 'black']
 
 fig = plt.figure()
 ax = plt.axes(projection="3d")
+i = 0
 for i in range(4):
     which = start + i*4*3 
 
@@ -29,11 +30,41 @@ for i in range(4):
     color = get_color(evts, np.max(evts), 'inferno')
 
     ax.quiver(led_pos[0], led_pos[1],led_pos[2], led_dir[0], led_dir[1], led_dir[2],color='black', length=0.5, normalize=True)
-    ax.scatter(positions[0], positions[1], positions[2], color=color) # colors[i])
-    break
+
+    ax.scatter(positions[0], positions[1], positions[2], color=colors[i])
+    #break
+
+which = 0
+
+led_ar_pos = get_led_positions([which,])
+led_dir = get_led_dirs([which,]).T
+led_pos = led_ar_pos[0]
+ids, times, evts = sample_leds(which, mu=100)
+
+positions = get_pmt_positions(ids).T 
+color = get_color(evts, np.max(evts), 'inferno')
+
+ax.quiver(led_pos[0], led_pos[1],led_pos[2], led_dir[0], led_dir[1], led_dir[2],color='black', length=0.5, normalize=True)
+
+ax.scatter(positions[0], positions[1], positions[2], color=colors[i+1])
+
+which = 256 #  start + 4*16*3 
+led_ar_pos = get_led_positions([which,])
+led_dir = get_led_dirs([which,]).T
+led_pos = led_ar_pos[0]
+ids, times, evts = sample_leds(which, mu=100)
+
+positions = get_pmt_positions(ids).T 
+color = get_color(evts, np.max(evts), 'inferno')
+
+ax.quiver(led_pos[0], led_pos[1],led_pos[2], led_dir[0], led_dir[1], led_dir[2],color='black', length=0.5, normalize=True)
+
+ax.scatter(positions[0], positions[1], positions[2], color=colors[i+2])
+
 
 ax.set_xlabel("X [m]")
 ax.set_ylabel("Y [m]")
 ax.set_zlabel("Z [m]")
 set_axes_equal(ax)
+plt.savefig("./plots/all_visible.png", dpi=400)
 plt.show()
