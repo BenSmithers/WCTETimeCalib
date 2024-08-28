@@ -8,6 +8,14 @@ from scipy.optimize import minimize
 import pandas as pd 
 import os 
 
+"""
+    All of the fitting code here needs to allow for some timing offset.
+
+    This...
+        1. allows for the actual time of the event to float. We won't necessarily know at which coarse counter moment a ball or and LED flashes. We also won't know it's relative offset
+        2. allows for only the relative timing offsets to be needed in doing this fit! 
+"""
+
 offset_dict = pd.read_csv(
     os.path.join(os.path.dirname(__file__),
     "..",
@@ -35,11 +43,11 @@ def fit_ball(pulse_times):
         return np.sum((times - pulse_times)**2)
 
 
-    x0 = np.array([0.1, 0.5, 1.5, 0])
+    x0 = np.array([0.1, 0.5, 0.1, 0])
     bounds =[
         [-5,5],
         [-5,5],
-        [0,5],
+        [-5,5],
         [-50,50]
     ]
     options= {
@@ -64,7 +72,7 @@ def fit_led_result(ids, sampled_times):
         predicted_times = (1e9)*distances*N_WATER/C + np.array(trimmed["calc_offset"]) + location_params[3]
         return np.sum((sampled_times - predicted_times)**2)
     
-    x0 = np.array([0,0,0, 0])
+    x0 = np.array([0.1,0.5,0.1, 0])
     bounds =[
         [-5,5],
         [-5,5],

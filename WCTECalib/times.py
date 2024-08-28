@@ -60,9 +60,11 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
         for a laser ball flasher result for a ball at `ball_pos`
 
         ball should be in meters 
+
+        We also add in some coarse counter offset to represent this being at a random point during a data-taking run. 
     """
     
-
+    coarse_counter_offset = np.random.rand()*(1e6)
 
     faux_data = pd.read_csv(os.path.join(
         os.path.dirname(__file__), "..","data","offsets.csv"
@@ -94,7 +96,7 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
     pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets + sample_differr
 
-    return pert_times
+    return pert_times + coarse_counter_offset
  
 
 def generate_offsets(offset=OFFSET_SCALE):

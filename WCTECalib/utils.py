@@ -12,11 +12,25 @@ DIFFUSER_ERR = 1*ns
 BALL_ERR = 2*mm 
 SAMPLE_SIZE = 8*ns
 
-ABS_LEN = 20 # meters 
+ABS_LEN = 20# meters 
 
 
 N_WATER = 1.33 
 ball_pos = np.array([0,0, 1.6])
+
+def convert_to_2d_offset(offset_dict):
+    """
+        Returns a 2D array for the relative offset between any combination of PMTs
+    """
+    calculated_offset = np.array(offset_dict["calc_offset"])
+    rotated = np.reshape(calculated_offset,(len(calculated_offset), 1))
+    return rotated - rotated.T
+
+def convert_to_1d_offset(offset_matrix, absolute_shift=0.0):
+    """
+        Takes a 2D matrix of relative offsets,
+        sets up some absolute time and shifts those
+    """
 
 # some random values
 CABLE_DELAY = np.array([
