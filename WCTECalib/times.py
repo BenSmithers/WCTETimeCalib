@@ -53,7 +53,7 @@ def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
 
     return np.array(true_data["unique_id"])[keep_these], pert_times[keep_these], m_sample[keep_these]
 
-def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_err = BALL_ERR, diff_err=DIFFUSER_ERR):
+def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_err = BALL_ERR, diff_err=DIFFUSER_ERR, mu=1):
     """
         Uses the sampled "true" shifts from `mc_timedist` 
         to generate a pseudoexperimental result 
@@ -89,26 +89,35 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
     distances = np.sqrt(np.sum( (positions - ball+ball_pos_shift)**2 , axis=1))
     true_times = second*distances*N_WATER/C
 
+    dmin = 3
+    munot = mu/exp(-dmin/ABS_LEN)
+    mueff= munot*np.exp(-distances/ABS_LEN)
+    mu_sample = np.random.poisson(mueff)
 
     true_offsets = true_times + np.array(true_data["offsets"])
 
     sample_differr = np.random.randn()*diff_err
 
-    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets + sample_differr
+    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets + sample_differr + coarse_counter_offset
 
-    return pert_times + coarse_counter_offset
- 
+    keep_these = mu_sample>0
+
+    return np.array(true_data["unique_id"]).astype(int)[keep_these], pert_times[keep_these], mu_sample[keep_these]
+
 
 def generate_offsets(offset=OFFSET_SCALE):
     mpmt_offset_sample = np.random.rand(N_MPMT)*offset
     mpmt_offset_sample = np.repeat(mpmt_offset_sample, N_CHAN)
 
-    pert_times = mpmt_offset_sample + np.random.randn(N_CHAN*N_MPMT)*PMT_OFF
+    pmt_offset = np.random.randn(N_CHAN*N_MPMT)*PMT_OFF
+    pert_times = mpmt_offset_sample + pmt_offset
 
     from copy import deepcopy
 
     new_df = deepcopy(df)
 
+    new_df["mPMT_offset"] = mpmt_offset_sample
+    new_df["pmt_offset"] = pmt_offset
     new_df["offsets"] = pert_times
 
     new_df.to_csv(

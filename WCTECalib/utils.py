@@ -18,19 +18,17 @@ ABS_LEN = 20# meters
 N_WATER = 1.33 
 ball_pos = np.array([0,0, 1.6])
 
-def convert_to_2d_offset(offset_dict):
+def convert_to_2d_offset(offset_dict, as_dict=True ):
     """
         Returns a 2D array for the relative offset between any combination of PMTs
     """
-    calculated_offset = np.array(offset_dict["calc_offset"])
+    if as_dict:
+        calculated_offset = np.array(offset_dict["calc_offset"])
+    else:
+        calculated_offset=offset_dict
     rotated = np.reshape(calculated_offset,(len(calculated_offset), 1))
     return rotated - rotated.T
 
-def convert_to_1d_offset(offset_matrix, absolute_shift=0.0):
-    """
-        Takes a 2D matrix of relative offsets,
-        sets up some absolute time and shifts those
-    """
 
 # some random values
 CABLE_DELAY = np.array([

@@ -1,16 +1,16 @@
-
 from WCTECalib.times import generate_offsets, sample_balltime, DIFFUSER_ERR, BALL_ERR, mm, ns
 from calculate_shifts import refit 
 from WCTECalib.utils import get_color
+from WCTECalib.geometry import N_CHAN, N_MPMT
 
 import pandas as pd
 import os 
 import numpy as np
 import matplotlib.pyplot as plt 
 
-
-ball_errs = [2*mm]
 intensity = [0.3, 1, 10]
+ball_errs = [2*mm]
+
 
 def sample(ball_err, noise, mu):
     generate_offsets()
@@ -19,20 +19,25 @@ def sample(ball_err, noise, mu):
 
 
     offsets = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","offsets.csv"))
-    true_off = np.array(offsets["offsets"])
+    true_off = np.array(offsets["mPMT_offset"])
     true_off-=true_off[0]
     true_off*=-1
 
     fits = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","calculated_offsets.csv"))
     fit_off = np.array(fits["calc_offset"])
 
-    return fit_off - true_off 
+    mpmt_time = np.mean(np.reshape(fits["calc_offset"], (N_MPMT, N_CHAN)), axis=1)
+    mpmt_time = np.repeat(mpmt_time, N_CHAN)
+
+
+    return fit_off - mpmt_time 
+
 
 for inoi, mu in enumerate(intensity):
     for ib, ball_err in enumerate(ball_errs):
 
         offset_err = []
-        bins = np.linspace(-2,2, 60)
+        bins = np.linspace(-20,20, 60)
         for i in range(20):
             offset_err+=sample(ball_err, 0.5, mu).tolist()
 
