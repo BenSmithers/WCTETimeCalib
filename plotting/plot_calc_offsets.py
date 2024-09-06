@@ -6,12 +6,25 @@ import pandas as pd
 import numpy as np 
 import os 
 
+ERRORS = False 
+
+
+true = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","offsets.csv"))
+
 offsets = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","calculated_offsets.csv"))
 
 times = offsets["calc_offset"]
+true_offsets = true["offsets"]
+
+if ERRORS:
+    times = times - (true_offsets[0]-true_offsets )
 
 
-colors = get_color( (times-np.min(times))/(np.max(times)-np.min(times)), 1)
+print("{} - {}".format(min(times), max(times))) 
+if ERRORS:
+    colors = get_color( times+0.25, 1)
+else:
+    colors = get_color( (times -min(times))/(max(times)-min(times)), 1)
 
 
 fig = plt.figure()
@@ -23,3 +36,14 @@ ax.set_zlabel("Z [m]")
 set_axes_equal(ax)
 plt.savefig("./plots/offsets_corrected.png", dpi=400)
 plt.show()
+
+
+if ERRORS:
+    bins = np.linspace(-1, 1, 100)
+    histo = np.histogram(times, bins)
+    plt.stairs(histo[0], bins)
+    plt.xlabel("Offset Error [ns]", size=14)
+    plt.ylabel("Counts")
+    plt.tight_layout()
+    plt.show()
+

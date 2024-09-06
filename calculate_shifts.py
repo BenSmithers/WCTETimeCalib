@@ -1,68 +1,70 @@
 import pandas as pd 
 import os 
 import numpy as np 
-from WCTECalib.utils import ball_pos, C, N_WATER, NOISE_SCALE, convert_to_2d_offset
+from WCTECalib.utils import ball_pos, C, N_WATER, NOISE_SCALE, convert_to_2d_offset, mm
 from WCTECalib.times import sample_balltime, second, BALL_ERR
 from copy import deepcopy
 from tqdm import tqdm
 """
     Calculates offsets relative to mPMT 0 and PMT 0
 """
-
+DEBUG = False 
 def refit(noise, ball_err=  BALL_ERR, mu=1):
     from WCTECalib.geometry import df, N_CHAN, get_pmt_positions, N_MPMT
 
+    print("{} - {}".format(noise, ball_err))
 
     samples = {}
     
-    ball_pos_err = np.random.randn(3)*ball_err
+    ball_pos_err = np.random.rand(3)
+    ball_pos_err /= np.sqrt(np.sum(ball_pos_err**2))
+    ball_pos_err*=ball_err
     
-    counts = np.zeros(N_MPMT*N_CHAN,dtype=int)
-    relative_offset_counter = np.reshape(counts,(len(counts), 1))
-    relative_offset_counter = relative_offset_counter - relative_offset_counter.T 
-    relative_offset_matrix = np.zeros(np.shape(relative_offset_counter))
+    print("Ball offset: {} {} {}".format(ball_pos_err[0]*1000, ball_pos_err[1]*1000, ball_pos_err[2]*1000))
 
+    offsets = np.linspace(-155, 155, 3600)
+    binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)
+    all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
     for i in tqdm(range(400)):
 
 
         # ball time is offset by a bit
         # time is biased by ball error 
-        ids, t_meas, npe = sample_balltime(noise=noise, ball=ball_pos+ball_pos_err, ball_pos_noise=False, diff_err=False, mu=mu)
+        ids, t_meas, npe = sample_balltime(noise=noise, ball=ball_pos+ball_pos_err, diff_err=False, mu=mu)
         positions = get_pmt_positions(ids)
+
+        if 0 not in ids:
+            continue
 
         distances = np.sqrt(np.sum( (positions - ball_pos)**2 , axis=1)) #predicted distances
         pred_time = second*distances*N_WATER/C
         
-        calculated_offset =t_meas - pred_time 
+        calculated_offset = t_meas - pred_time 
+        calculated_offset = calculated_offset[0]-calculated_offset 
 
+        all_bins += np.histogram2d(ids, calculated_offset, bins=(binids, offsets))[0]
 
-        counts*=0 
-        counts[ids]=1
-        kt, kt = np.meshgrid(counts, counts)
-        keep_mesh = kt*kt.T
+    id_mesh, offset_mesh = np.meshgrid(0.5*(binids[1:] + binids[:-1]), 0.5*(offsets[1:] + offsets[:-1]))
 
-        these_offsets= np.zeros(N_MPMT*N_CHAN)
-        these_offsets[ids] = calculated_offset
-
-        differences = convert_to_2d_offset(these_offsets, False)
-        differences[np.logical_not(keep_mesh)] = 0.0
-        relative_offset_matrix += differences
-        relative_offset_counter= relative_offset_counter + keep_mesh
-
-
-    mean_offsets = relative_offset_matrix/relative_offset_counter
+    # calculate the mean of the distribution
+    mean_offsets = np.sum(offset_mesh.T*all_bins, axis=1)/np.sum(all_bins, axis=1)
     
-
+    if DEBUG:
+        import matplotlib.pyplot as plt 
+        plt.pcolormesh(binids, offsets, np.log(all_bins.T +1))
+        plt.xlabel("ID")
+        plt.ylabel("Offset time")
+        plt.show()
 
     new_df = deepcopy(df)
 
-    new_df["calc_offset"] = mean_offsets[0]
+    new_df["calc_offset"] = mean_offsets
 
     new_df.to_csv(
         os.path.join(os.path.dirname(__file__), "data","calculated_offsets.csv"),
         index=False
     )
-    return ball_pos+ball_pos_err
+    return np.array(df["unique_id"]), mean_offsets
 
 if __name__=="__main__":
-    refit(NOISE_SCALE)
+    refit(noise=0.0*NOISE_SCALE, ball_err=100*mm)

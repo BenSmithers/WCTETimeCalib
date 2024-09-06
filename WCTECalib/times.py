@@ -53,7 +53,7 @@ def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
 
     return np.array(true_data["unique_id"])[keep_these], pert_times[keep_these], m_sample[keep_these]
 
-def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_err = BALL_ERR, diff_err=DIFFUSER_ERR, mu=1):
+def sample_balltime(noise = NOISE_SCALE, ball=None,diff_err=DIFFUSER_ERR, mu=1):
     """
         Uses the sampled "true" shifts from `mc_timedist` 
         to generate a pseudoexperimental result 
@@ -74,19 +74,8 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
     positions = get_pmt_positions()
 
-    if ball is None:
-        ball = ball_pos #default position
-        nominal = True
-    else:
-        nominal = False 
 
-
-    ball_pos_shift = np.random.randn(3)*ball_err
-
-    if not ball_pos_noise:
-        ball_pos_shift*=0.0
-
-    distances = np.sqrt(np.sum( (positions - ball+ball_pos_shift)**2 , axis=1))
+    distances = np.sqrt(np.sum( (positions - ball)**2 , axis=1))
     true_times = second*distances*N_WATER/C
 
     dmin = 3
@@ -98,7 +87,7 @@ def sample_balltime(noise = NOISE_SCALE, ball=None, ball_pos_noise = True, ball_
 
     sample_differr = np.random.randn()*diff_err
 
-    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets + sample_differr + coarse_counter_offset
+    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets  + coarse_counter_offset
 
     keep_these = mu_sample>0
 
