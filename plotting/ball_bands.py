@@ -47,8 +47,8 @@ for ib, ball_err in enumerate(ball_errs):
             random_angle = np.random.rand(SAMPLES)*2*pi 
 
             xs = np.cos(random_angle)*radii
-            ys = np.sin(random_angle)*radii
-            zs = np.random.rand(SAMPLES)*3 
+            zs = np.sin(random_angle)*radii
+            ys = np.random.rand(SAMPLES)*3 
             print("next noise")
 
             these_diffs = []
