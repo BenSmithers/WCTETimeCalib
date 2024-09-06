@@ -51,7 +51,7 @@ def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
 
     keep_these = m_sample>0
 
-    return np.array(true_data["unique_id"])[keep_these], pert_times[keep_these], m_sample[keep_these]
+    return np.array(true_data["unique_id"]).astype(int)[keep_these], pert_times[keep_these], m_sample[keep_these]
 
 def sample_balltime(noise = NOISE_SCALE, ball=None,diff_err=DIFFUSER_ERR, mu=1):
     """
