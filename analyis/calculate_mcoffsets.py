@@ -32,7 +32,19 @@ for flash_id  in range(n_flash):
     _t_meas= np.array(data["times"][flash_id])
     _charge = np.array(data["charge"][flash_id])
 
-            
+    these_data = np.array([_ids, _t_meas, _charge]).T 
+    these_data = np.array(sorted(these_data, key=lambda x:x[1] ))
+
+    ids = []
+    charges = []
+    t_meas = []
+    for entry in these_data:
+        if entry[0] not in ids:
+            ids.append(entry[0])
+            charges.append(entry[2])
+            t_meas.append(entry[1])
+    t_meas = np.array(t_meas)
+    ids = np.array(ids)
     #charge = []
 
     # we need to filter this so only the earliest time entry is kept
@@ -53,10 +65,10 @@ mean_offsets = np.sum(offset_mesh.T*all_bins, axis=1)/np.sum(all_bins, axis=1)
 
 new_df = deepcopy(df)
 
-new_df["calc_offset"] = mean_offsets
+new_df["calc_offset"] = mean_offsets - mean_offsets[0]
 
 new_df.to_csv(
-    os.path.join(os.path.dirname(__file__), "data","calculated_offsets_lbmc.csv"),
+    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lbmc.csv"),
     index=False
 )
 np.array(df["unique_id"]), mean_offsets
