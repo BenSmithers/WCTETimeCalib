@@ -59,15 +59,7 @@ for flash_id  in range(n_flash):
 
     # we need to filter this so only the earliest time entry is kept
 
-    positions = get_pmt_positions(ids)
-
-    distances = np.sqrt(np.sum( (positions - central_ball_loc)**2 , axis=1)) #predicted distances
-    pred_time = second*distances*N_WATER/C
-    
-    earliest_hit_time = t_meas - pred_time 
-#    calculated_offset = calculated_offset[0]-calculated_offset 
-
-    all_bins += np.histogram2d(ids, earliest_hit_time, bins=(binids, offsets))[0]
+    all_bins += np.histogram2d(ids, t_meas, bins=(binids, offsets))[0]
 
 if DEBUG:
     peaks = []
@@ -94,12 +86,7 @@ for id in tqdm(range(len(all_bins))):
         "gtol":1e-20
     }
     res = minimize(metric, x0, bounds=bounds, options=options)
-    cfd_time = (10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
-    #results = find_peaks(all_bins[id], height=0.5*np.max(all_bins[id]))
-
-    #peak_indices = results[0]
-    #peak_heights = results[1]["peak_heights"]
-
+    cfd_time = -(10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
 
 
     if DEBUG and id%50==0:
@@ -114,15 +101,14 @@ plt.xlabel("Timing [ns]", size=14)
 plt.savefig(os.path.join(os.path.dirname(__file__), "..","plotting","plots","raw_offset_distribution.png"), dpi=400)
 plt.show()
 
+ids = (0.5*(binids[1:] + binids[:-1])).astype(int)
     
+positions = get_pmt_positions(ids)
 
+distances = np.sqrt(np.sum( (positions - central_ball_loc)**2 , axis=1)) #predicted distances
+pred_time = second*distances*N_WATER/C
 
-
-#id_mesh, offset_mesh = np.meshgrid(0.5*(binids[1:] + binids[:-1]), 0.5*(offsets[1:] + offsets[:-1]))
-# calculate the mean of the distribution
-#mean_offsets = np.sum(offset_mesh.T*all_bins, axis=1)/np.sum(all_bins, axis=1)
-
-use_offsets = np.array(peaks)
+use_offsets = np.array(peaks)-pred_time
 
 new_df = deepcopy(df)
 

@@ -1,5 +1,5 @@
-from WCTECalib.times import generate_offsets, sample_balltime
-from WCTECalib.geometry import N_MPMT, get_pmt_positions
+from WCTECalib.times import sample_balltime
+from WCTECalib.alt_geo import get_pmt_positions
 from WCTECalib.utils import C, N_WATER, set_axes_equal
 
 from WCTECalib.fitting import fit_hits 
@@ -17,7 +17,7 @@ offset_dict = pd.read_csv(
     os.path.join(os.path.dirname(__file__),
     "..",
     "data",
-    "calculated_offsets.csv")
+    "calculated_offsets_lbmc.csv")
 )
 
 n_diffs = len(np.array(offset_dict["X"]))
@@ -30,7 +30,7 @@ def main():
     zs = np.sin(random_angle)*radii
     ys = np.random.rand()*2-0.5
 
-    ids, otimes, mus = sample_balltime(ball= np.array([xs, ys, zs]), mu=1)
+    ids, otimes, mus = sample_balltime(ball= np.array([xs, ys, zs]), mu=0.1)
     fit = fit_hits(ids, otimes)
     pmt_pos = get_pmt_positions(ids)
 
@@ -38,7 +38,7 @@ def main():
     distances = np.sqrt(np.sum((pmt_pos - fit[0:3])**2, axis=1))
     times = (1e9)*distances*N_WATER/C 
 
-    offset_adjusted_t = otimes + np.array(offset_dict["calc_offset"])[ids] - fit[3]
+    offset_adjusted_t = otimes + np.array(offset_dict["calc_offset"])[ids-1] - fit[3]
 
     diffs = times - offset_adjusted_t 
 
@@ -71,7 +71,7 @@ def main():
         plt.show()
 
     error  = np.sqrt( (xs - fit[0])**2 + (ys-fit[1])**2 + (zs-fit[2])**2)
-
+    print("fit err: {}".format(error))
 
     ax = plt.axes(projection="3d")
     ax.scatter(pmt_pos.T[0], pmt_pos.T[1], pmt_pos.T[2], color=colors)
