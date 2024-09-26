@@ -16,25 +16,11 @@ filename = os.path.join(
 mm = 1e-3
 m = 1
 
-data = np.loadtxt(filename, delimiter=' ', comments='#').T
-
-_mpmt_xshift =  [0.*mm, 84.43*mm, 42.21*mm, -42.21*mm, -84.43*mm, -42.21*mm, 42.21*mm, 155.109*mm, 134.32*mm, 77.55*mm, 0.*mm, -77.55*mm, -134.32*mm, -155.109*mm, -134.32*mm, -77.55*mm, 0.*mm, 77.55*mm, 134.32*mm]
-_mpmt_yshift = [0.*mm, 0.*mm, -73.125*mm, -73.125*mm, 0.*mm, 73.125*mm, 73.125*mm, 0.*mm, -77.55*mm, -134.32*mm, -155.109*mm, -134.32*mm, -77.55*mm, 0.*mm, 77.55*mm, 134.32*mm, 155.109*mm, 134.32*mm, 77.55*mm]
-_mpmt_zshift= [0.*mm, -13.91*mm, -13.91*mm, -13.91*mm, -13.91*mm, -13.91*mm, -13.91*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm, -50.88*mm]
-_pmt_shifts = np.array([
-    _mpmt_xshift, _mpmt_yshift, _mpmt_zshift
-])
-
-
-_pmt_shifts = _pmt_shifts.T
-
-xs = data[3]*mm
-ys = data[4]*mm
-zs = data[5]*mm
-
 
 
 geo_file = os.path.join(os.path.dirname(__file__), "..","data", "geometry.csv")
+
+
 _unique_id_count = 0
 
 
@@ -45,70 +31,27 @@ if os.path.exists(geo_file):
         df["Y"],
         df["Z"]
     ]
-    N_MPMT=106
+    channels= df["Chan"]
+    N_MPMT=97
 else:
-    channels = []
-    _positions = [] 
-    dirs = []
-    mPMT_id= []
+    mc_geo_file = os.path.join(os.path.dirname(__file__), "..","data", "geodump.npz")
+    mc_geo = np.load(mc_geo_file, allow_pickle=True)
+
+    unique_id = mc_geo["tube_no"]
+    _positions = mc_geo["position"]/100
+    dirs = mc_geo["orientation"]
+    N_MPMT= int(len(unique_id)/N_CHAN)
+    print(N_MPMT)
+    channels = list(range(N_CHAN))*N_MPMT
+    assert len(channels) == len(unique_id)
+    mPMT_id = np.repeat(range(N_CHAN), N_MPMT)
+
+
     led_mpmt = []
-    unique_id = []
     led_pos = []
     led_dir = []
     led_ids = []
-    for i in range(len(data[0])):
-        shift = np.array([data[3][i], data[4][i], data[5][i]])*mm
-        dx = data[6][i]
-        dy = data[7][i]
-        dz = data[8][i]
-
-        rotation = data[9][i]*pi/180
-
-        # rotate about y axis, angle should be based on direction in xz plane 
-        theta = pi+np.arctan2(dy, dx)
-        spinny = np.array([
-                    [cos(rotation), sin(rotation), 0],
-                    [-sin(rotation), cos(rotation), 0],
-                    [0, 0, 1]
-                ])
-        
-        if abs(dz)<1e-5:
-            rot_mat = np.array([
-                        [cos(-pi/2),0,sin(-pi/2)],
-                        [0,1,0],
-                        [-sin(-pi/2),0, cos(-pi/2)],
-                    ])
-            rot_mat2 = np.array([
-                [1,0,0],
-                [0, cos(-theta), sin(-theta)],
-                [0, -sin(-theta), cos(-theta)]
-            ])
-            full_rot = np.matmul(np.matmul( rot_mat, rot_mat2), spinny)
-            
-        elif dz>0.5:
-            full_rot = spinny
-        else:
-
-            rot_mat2 = np.array([
-                        [1,0,0],
-                        [0,cos(-pi),sin(-pi) ],
-                        [0,-sin(-pi), cos(-pi)],
-                    ])
-            full_rot = np.matmul( spinny, rot_mat2)
-
-        for chan in range(N_CHAN):
-            rotated = np.matmul(full_rot, _pmt_shifts[chan])
-            this_pos = shift + rotated 
-            _positions.append(this_pos)
-            channels.append(chan)
-            mPMT_id.append(i)
-            this_dir = this_pos - shift 
-            dirs.append(this_dir / np.sqrt(np.sum(this_dir**2)))
-            unique_id.append(_unique_id_count)
-            _unique_id_count+=1
-            
-            if np.sum(this_dir**2)<1e-15:
-                print(_unique_id_count)
+    
 
 
     _positions = np.transpose(_positions)
@@ -119,7 +62,7 @@ else:
         channels, 
         _positions[0], 
         _positions[1],
-        _positions[2], 
+        -1*_positions[2], 
         dirs[0], 
         dirs[1],
         dirs[2]
@@ -128,7 +71,8 @@ else:
     df = pd.DataFrame(
         columns = ["unique_id", "mPMT", "Chan", "X", "Y", "Z", "dx", "dy", "dz"],
         data = _data
-    )
+    )  
+    df.to_csv(geo_file, index=False)
 
     channels =np.array(channels)
     _positions = np.array(_positions)

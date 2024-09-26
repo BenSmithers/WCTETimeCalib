@@ -3,15 +3,15 @@
 """
 
 from WCTECalib.utils import *
-from WCTECalib.geometry import get_pmts_visible, get_led_positions, df
-from WCTECalib.geometry import N_CHAN, N_MPMT, get_pmt_positions
+#from WCTECalib.alt_geo import get_pmts_visible, get_led_positions, 
+from WCTECalib.alt_geo import N_CHAN, N_MPMT, get_pmt_positions, df
 from copy import deepcopy
 import numpy as  np
 import pandas as pd 
 import os 
 from math import exp 
 
-def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
+def sample_leds(led_no, mu=1, noise=NOISE_SCALE, max_angle=25):
     """
     Possible output from flashing LED number `led_no` 
     at a brightness where the nearest LED would see on average 1 pe 
@@ -33,7 +33,7 @@ def sample_leds(led_no, mu=1, noise=NOISE_SCALE):
 
     # we get the positions of the PMTs that are visible
     # and the distances to those PMTs 
-    keep = get_pmts_visible(led_no) # unique IDs! 
+    keep = get_pmts_visible(led_no, max_angle) # unique IDs! 
     true_data = true_data[keep]
     positions = get_pmt_positions(true_data["unique_id"])
 
@@ -87,7 +87,7 @@ def sample_balltime(noise = NOISE_SCALE, ball=None,diff_err=DIFFUSER_ERR, mu=1):
 
     sample_differr = np.random.randn()*diff_err
 
-    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets  + coarse_counter_offset
+    pert_times = np.random.randn(N_CHAN*N_MPMT)*noise + true_offsets  #+ coarse_counter_offset
 
     keep_these = mu_sample>0
 
@@ -99,6 +99,7 @@ def generate_offsets(offset=OFFSET_SCALE):
     mpmt_offset_sample = np.repeat(mpmt_offset_sample, N_CHAN)
 
     pmt_offset = np.random.randn(N_CHAN*N_MPMT)*PMT_OFF
+    pmt_offset += np.min(pmt_offset)
     pert_times = mpmt_offset_sample + pmt_offset
 
     from copy import deepcopy
