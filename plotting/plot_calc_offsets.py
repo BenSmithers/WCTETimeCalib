@@ -13,6 +13,8 @@ true = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","offsets.
 
 labels = ["Lock", "No Lock"]
 offset_names = ["calculated_offsets_lock.csv", "calculated_offsets_lbmc.csv" ]
+
+fig2d, axes = plt.subplots(1,1)
 for i, name in enumerate(offset_names):
 
     offsets = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data",name))
@@ -35,7 +37,7 @@ for i, name in enumerate(offset_names):
         fig = plt.figure()
         ax = plt.axes(projection="3d")
         #ax.pcolormesh([0, 1], [0,1], [[0,]], vmin=-0.5, vmax=0.5, cmap="coolwarm", )
-        scatterpts = ax.scatter(offsets["X"], offsets["Y"], offsets["Z"], c=times, cmap="coolwarm", vmin=-10,vmax=10)
+        scatterpts = ax.scatter(offsets["X"], offsets["Y"], offsets["Z"], c=times, cmap="coolwarm", vmin=-2,vmax=2)
         ax.set_xlabel("X [m]")
         ax.set_ylabel("Y [m]")
         ax.set_zlabel("Z [m]")
@@ -47,17 +49,19 @@ for i, name in enumerate(offset_names):
 
 
     if ERRORS:
+        times = times[ np.abs(times)<5 ]
         bins = np.linspace(-2,2, 200)
         histo = np.histogram(times, bins=bins)[0]
+        plt.text(x=2.4, y=65+i*30, s=labels[i]+": ")
+        plt.text(x=2.5, y=50+i*30, s="{:.2f} +/- {:.2f}".format(np.mean(times), np.std(times)))
+            
+        axes.stairs(histo, bins, label=labels[i])
 
-        plt.stairs(histo, bins, label=labels[i])
+axes.set_xlabel("Offset Error [ns]", size=14)
+axes.set_ylabel("Counts")
+fig2d.legend()
+fig2d.tight_layout()
 
-plt.xlabel("Offset Error [ns]", size=14)
-plt.ylabel("Counts")
-#plt.text(x=2.5, y=50, s="{:.2f} +/- {:.2f}".format(np.mean(times), np.std(times)))
-plt.legend()
-plt.tight_layout()
-
-plt.savefig("./plots/offsets_error.png",dpi=400)
+fig2d.savefig("./plots/offsets_error.png",dpi=400)
 plt.show()
 

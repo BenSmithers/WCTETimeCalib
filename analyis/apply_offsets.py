@@ -28,12 +28,28 @@ shift_pmts = []
 shift_charge = []
 
 phase_lock = False 
-frequency = 200 #ns  - associated with a 5/3MHz frequency 
+frequency = 200000 #ns  - associated with a 5MHz frequency 
+
+# choose a five bad PMTs 
+bad_ids = np.array(range(1843))
+bad_ids = bad_ids[bad_ids%300 == 1]
+print(bad_ids)
+# choose an index where the clock changes 
+flipflop = np.random.randint(50, len(pmt_hits),5)
+
 
 for ir, runno in tqdm(enumerate(range(len(pmt_hits)))):
     these_hit_pmts = pmt_hits[runno]
     these_charges = charges[runno]
-    these_hit_times = times[runno] + true["offsets"][these_hit_pmts] + ir*frequency
+    these_hit_times = np.array(times[runno] + true["offsets"][these_hit_pmts] + ir*frequency)
+    
+    if False:
+        for j, flop in enumerate(flipflop):
+                
+            if ir>flop:
+                mask = np.where(np.in1d(these_hit_pmts, bad_ids[j]))[0]
+                if np.sum(mask.astype(int))!=0:
+                    these_hit_times[mask] = these_hit_times[mask] + 8
 
     shift_times.append(these_hit_times.tolist())
     shift_pmts.append(these_hit_pmts.tolist())

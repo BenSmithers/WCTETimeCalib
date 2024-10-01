@@ -17,10 +17,10 @@ outfile = os.path.join(
     os.path.dirname(__file__),
     "..",
     "data",
-    "wcsim_offset.json"
+    "wcsim_offset_lock.json"
 )
 
-offsets = np.linspace(-180, 180, 3600)
+offsets = np.linspace(-180, 180, 720)
 offset_center = 0.5*(offsets[1:] + offsets[:-1])
 binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)+1 
 all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
@@ -33,6 +33,7 @@ _obj.close()
 
 n_flash = len(data["times"])
 
+print("... selecting early hits")
 for flash_id  in range(n_flash):
     # ids in the data files are off by 1 relative to the geo file
     _ids = np.array(data["pmtid"][flash_id])+1
@@ -54,21 +55,25 @@ for flash_id  in range(n_flash):
             t_meas.append(entry[1])
     t_meas = np.array(t_meas)
     ids = np.array(ids)
+    bin_where = np.argwhere(ids==1)[0]
+    _t_meas = _t_meas - t_meas[bin_where] 
 
     #charge = []
 
     # we need to filter this so only the earliest time entry is kept
 
-    all_bins += np.histogram2d(ids, t_meas, bins=(binids, offsets))[0]
+    all_bins += np.histogram2d(_ids, _t_meas, bins=(binids, offsets))[0]
 
 if DEBUG:
     peaks = []
     import matplotlib.pyplot as plt
     from WCTECalib.utils import get_color 
 
+metrics = []
 print("... fitting hits")
+nplot = 0
 for id in tqdm(range(len(all_bins))):
-    this_wave = all_bins[id]
+    this_wave = all_bins[id]/np.sum(all_bins[id])
     def metric(params):
         sigma = 10**params[2]
 
@@ -86,20 +91,35 @@ for id in tqdm(range(len(all_bins))):
         "gtol":1e-20
     }
     res = minimize(metric, x0, bounds=bounds, options=options)
-    cfd_time = -(10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
+    cfd_time =res.x[1] # -(10**res.x[2])*sqrt(-2*log(0.5)) + 
+    goodness = metric(res.x)
+    metrics.append(goodness)
 
-
-    if DEBUG and id%50==0:
-        plt.stairs(all_bins[id], offsets, color=get_color(id, 2014), alpha=1.)
-
+    if id%300==1: #goodness > 0.015:
+        plt.stairs(this_wave + nplot*0.025+0.001, offsets+0.5, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
+        plt.stairs(this_wave + nplot*0.025, offsets, color=get_color(id, 1900, "inferno"), alpha=1., zorder=100-nplot, fill=True)
+        xfine = np.linspace(min(offset_center), max(offset_center), 3000)
+        yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
+        #plt.plot(xfine, yfine, 'red', alpha=1.0, ls='--', zorder=11)
+        nplot+=1
     peaks.append(cfd_time)
 
 
-        
-plt.title("PMT {}".format(id))
-plt.xlabel("Timing [ns]", size=14)
+plt.title("Various PMTs", size=14)
+plt.xlabel("Earliest Relative Hit Time [ns]", size=14)
+plt.ylabel("Arb. Units",size=14)
+plt.xlim([-40,60])
+plt.ylim([0, 0.55])
 plt.savefig(os.path.join(os.path.dirname(__file__), "..","plotting","plots","raw_offset_distribution.png"), dpi=400)
 plt.show()
+plt.clf()
+
+bins =np.linspace( np.min(metrics), np.max(metrics), 100)
+binned_met = np.histogram(metrics, bins)
+plt.stairs(binned_met[0], bins)
+plt.xlabel("Fit Metric", size=14)
+plt.ylabel("Counts",size=14)
+        
 
 ids = (0.5*(binids[1:] + binids[:-1])).astype(int)
     
@@ -112,7 +132,7 @@ use_offsets = np.array(peaks)-pred_time
 
 new_df = deepcopy(df)
 
-new_df["calc_offset"] = use_offsets[0]-use_offsets 
+new_df["calc_offset"] = use_offsets[0]-use_offsets
 
 new_df.to_csv(
     os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lbmc.csv"),

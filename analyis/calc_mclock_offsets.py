@@ -10,7 +10,6 @@ from scipy.optimize import minimize
 from tqdm import tqdm
 
 pmt_no = 0
-
 outfile = os.path.join(
     os.path.dirname(__file__),
     "..",
@@ -18,8 +17,12 @@ outfile = os.path.join(
     "wcsim_offset_lock.json"
 )
 
-PHASELOCK = 200
-offsets = np.linspace(0, PHASELOCK, 2401)
+PHASELOCK = 200000.0# 0.005
+outname = os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lock.csv")
+
+print(PHASELOCK)
+maxtime = min([600, PHASELOCK])
+offsets = np.linspace(0, maxtime, 1201)
 offset_center = 0.5*(offsets[1:] + offsets[:-1])
 # we need to offset the IDs by one to match WCSim
 binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1) +1
@@ -50,18 +53,20 @@ for flash_id  in tqdm(range(n_flash)):
     
     _ids = np.array(hit_ids[flash_id])+1
 
-    _t_meas= (np.array(hit_times[flash_id])+0.5*PHASELOCK) -flash_id*PHASELOCK
+    _t_meas= (np.array(hit_times[flash_id])+0.5*maxtime)  -flash_id*PHASELOCK
     _charge = np.array(hit_charges[flash_id])
 
     all_bins += np.histogram2d(_ids, _t_meas, bins=(binids, offsets))[0]
 
 
 all_times = []
+metrics = []
+num_bad = 0
 called_once = False
 print("... fitting distributions")
 for i in tqdm(range(len(all_bins))):
 
-    this_wave = all_bins[i]
+    this_wave = all_bins[i]/np.sum(all_bins[i])
     def metric(params):
         sigma = 10**params[2]
 
@@ -81,22 +86,41 @@ for i in tqdm(range(len(all_bins))):
     res = minimize(metric, x0, bounds=bounds, options=options)
     cfd_time = -(10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
     all_times.append(cfd_time)
-
-    if (10**res.x[2])>1.0:
+    this_met = metric(res.x)
+    metrics.append(this_met)
+    if  this_met>0.165: # i%300==1:
         called_once = True
         xfine = np.linspace(0, PHASELOCK, 3000)
         yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
         #print(res.x[2])
         #print("One at {}".format(res.x[1]))
         #plt.vlines(res.x[1], 0,40, color='k', alpha=0.1,zorder=0)
-        plt.plot(xfine, yfine, 'red', alpha=0.2, zorder=11)
-        plt.vlines(cfd_time, [0,], [max(yfine),], color='k', zorder=0)
-        plt.stairs(all_bins[i], offsets, color=get_color(i+20, 2033), zorder=10)
-
+        #plt.plot(xfine, yfine+ num_bad*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-num_bad+0.25)
+        #plt.vlines(cfd_time, [0,], [max(yfine),], color='k', zorder=0)
+        
+        plt.stairs(this_wave + num_bad*0.025+0.001, offsets+0.5, color='k', alpha=0.3, zorder=100-num_bad-0.5, fill=True)
+        plt.stairs(this_wave + num_bad*0.025, offsets, color=get_color(i*0.25 + num_bad*50, 850, "inferno"), alpha=1., zorder=100-num_bad, fill=True)
+        num_bad +=1
 if called_once:
-    plt.xlabel("Time [ns]", size=14)
+    plt.xlabel(r"Time mod $f$ [ns]", size=14)
+    #plt.xlim([10, 120])
+    plt.ylabel("Arb. Units",size=14)
+    plt.ylim([0, 0.55])
     plt.savefig("../plotting/plots/mod_time_distribution.png", dpi=400)
+    
     plt.show()
+    
+
+# metric! 
+plt.clf()
+qbin = np.linspace(min(metrics), max(metrics), 200)
+plt.hist(metrics, bins=qbin)
+plt.yscale('log')
+plt.xlabel("Fit Metric",size=14)
+plt.ylabel("Arb. Units", size=14)
+plt.show()
+
+
 
 all_times = np.array(all_times) -pred_time
 
@@ -105,6 +129,6 @@ new_df = deepcopy(df)
 new_df["calc_offset"] = all_times[0] - all_times
 
 new_df.to_csv(
-    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lock.csv"),
+    outname,
     index=False
 )
