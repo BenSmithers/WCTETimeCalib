@@ -64,6 +64,7 @@ metrics = []
 num_bad = 0
 called_once = False
 print("... fitting distributions")
+highlight =[1151.0, 1644.0, 1645.0, 1646.0, 1682.0, 1705.0, 1739.0]
 for i in tqdm(range(len(all_bins))):
 
     this_wave = all_bins[i]/np.sum(all_bins[i])
@@ -84,11 +85,12 @@ for i in tqdm(range(len(all_bins))):
         "gtol":1e-20
     }
     res = minimize(metric, x0, bounds=bounds, options=options)
-    cfd_time = -(10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
+    #cfd_time = -(10**res.x[2])*sqrt(-2*log(0.5)) + res.x[1]
+    cfd_time = res.x[1] 
     all_times.append(cfd_time)
     this_met = metric(res.x)
     metrics.append(this_met)
-    if  this_met>0.165: # i%300==1:
+    if  (i+1) in highlight:
         called_once = True
         xfine = np.linspace(0, PHASELOCK, 3000)
         yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
