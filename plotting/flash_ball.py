@@ -1,5 +1,5 @@
 from WCTECalib.times import sample_balltime, second, BALL_ERR
-from WCTECalib.geometry import df, N_CHAN, get_pmt_positions, N_MPMT
+from WCTECalib import df, N_CHAN, get_pmt_positions, N_MPMT
 from WCTECalib.utils import ball_pos, C, N_WATER, NOISE_SCALE, convert_to_2d_offset
 from WCTECalib.utils import set_axes_equal, get_color
 
@@ -17,7 +17,7 @@ ball_pos_err = np.random.randn(3)*0.0
 
 all_ids = np.array(range(N_MPMT*N_CHAN))
 
-ids, t_meas, npe = sample_balltime(noise=noise, ball=ball_pos+ball_pos_err, ball_pos_noise=False, diff_err=False, mu=0.3)
+ids, t_meas, npe = sample_balltime(noise=noise, ball=ball_pos, ball_pos_noise=False, diff_err=False, mu=0.3)
 
 positions_keep = get_pmt_positions(ids).T
 

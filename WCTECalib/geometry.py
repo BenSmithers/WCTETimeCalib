@@ -11,7 +11,7 @@ from WCTECalib.utils import set_axes_equal, C, N_WATER
 from Geometry.WCD import WCD
 N_CHAN = 19
 PMT_MAX = 85*pi/180
-LED_MAX = 25*pi/180
+LED_MAX = 25 #*pi/180
 
 wcte = WCD("wcte", kind="WCTE")
 
@@ -67,6 +67,8 @@ else:
 
 
         for iled in range(3):
+            if len( mpmt.leds)==0:
+                continue
             this_led = mpmt.leds[iled].get_placement('design', wcte)
             _led_pos.append(fix_cord(this_led["location"])/1000.)
             _led_dir.append(fix_cord(this_led["direction_z"]))
@@ -136,11 +138,15 @@ if __name__=="__main__":
 
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import axes3d
+    from WCTECalib.utils import get_color
     fig = plt.figure()
     ax = plt.axes(projection="3d")
-    ax.scatter(_positions[0], _positions[1], _positions[2])
-    #ax.scatter(_feeds[0], _feeds[1], _feeds[2],'green')
-    ax.quiver(_led_pos[0], _led_pos[1], _led_pos[2],_led_dir[0], _led_dir[1], _led_dir[2],color='red', length=0.1, normalize=True)
+    cut = _positions[1]>-1000 
+    #fcut = _feeds[1]>-10
+    colors = get_color(df["Chan"], 19, "inferno")
+    ax.scatter(_positions[0][cut], _positions[1][cut], _positions[2][cut], color=colors)
+    #ax.scatter(_feeds[0][fcut], _feeds[1][fcut], _feeds[2][fcut],'green')
+    #ax.quiver(_led_pos[0], _led_pos[1], _led_pos[2],_led_dir[0], _led_dir[1], _led_dir[2],color='red', length=0.1, normalize=True)
     ax.set_xlabel("X [m]")#
     ax.set_ylabel("Y [m]")
     ax.set_zlabel("Z [m]")
@@ -148,15 +154,19 @@ if __name__=="__main__":
     plt.show()
 
 
-def get_pmts_visible(led_id:int):
+
+def get_pmts_visible(led_id:int, led_max_angle=LED_MAX):
     """
         Returns a filter (an array of bools) for which PMTs are visible for an LED flash 
+
+        the "max angle" is half of the maximum opening angle the PMT emits light
     """
+
+    led_max_angle_rad = led_max_angle*pi/180 
+
     led_ar_pos = get_led_positions([led_id,])
     led_pos = led_ar_pos[0]
     led_dir = get_led_dirs([led_id,])[0]
-
-    max_angle = 60*pi/180
 
     pmt_pos = get_pmt_positions()
     pmt_dir = get_pmt_dirs()
@@ -165,10 +175,10 @@ def get_pmts_visible(led_id:int):
     dvec = led_pos - pmt_pos
 
     pmt_light_angle = np.arccos(np.sum(pmt_dir*dvec, axis=1) / np.sqrt(np.sum(dvec**2, axis=1)))
-    led_light_angle =np.arccos(np.sum(led_dir*(-1*dvec), axis=1) / np.sqrt(np.sum(dvec**2, axis=1)))
+    led_light_angle = np.arccos(np.sum(led_dir*(-1*dvec), axis=1) / np.sqrt(np.sum(dvec**2, axis=1)))
 
 
-    keep = np.logical_and(pmt_light_angle<PMT_MAX, led_light_angle < LED_MAX)
+    keep = np.logical_and(pmt_light_angle<PMT_MAX, led_light_angle < led_max_angle_rad)
  
     return keep#  df[keep]["unique_id"]
 

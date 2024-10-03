@@ -10,7 +10,7 @@ import numpy as np
 import json 
 from tqdm import tqdm 
 
-from WCTECalib.alt_geo import N_MPMT, N_CHAN
+from WCTECalib import N_MPMT, N_CHAN
 
 true = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","offsets.csv"))
 
@@ -47,7 +47,7 @@ for ir, runno in tqdm(enumerate(range(len(pmt_hits)))):
     shift_times+= these_hit_times.tolist()
     shift_pmts+=these_hit_pmts.tolist()
     shift_charge += these_charges.tolist()
-    
+
 if False:
     min_time = min(shift_times)
     max_time = max(shift_times)

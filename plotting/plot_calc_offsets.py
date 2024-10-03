@@ -21,11 +21,15 @@ for i, name in enumerate(offset_names):
 
     times = offsets["calc_offset"]
     true_offsets = true["offsets"]
+    ids = true["unique_id"]
+
+
 
     if ERRORS:
         times = times - (true_offsets[0] -true_offsets)
         #times = times - true_offsets
-
+        bad = times<-1.0
+        print(list(ids[bad]))
 
     print("{} - {}".format(min(times), max(times))) 
     if ERRORS:
@@ -36,8 +40,9 @@ for i, name in enumerate(offset_names):
     if False:
         fig = plt.figure()
         ax = plt.axes(projection="3d")
+        cut = times<-0.5
         #ax.pcolormesh([0, 1], [0,1], [[0,]], vmin=-0.5, vmax=0.5, cmap="coolwarm", )
-        scatterpts = ax.scatter(offsets["X"], offsets["Y"], offsets["Z"], c=times, cmap="coolwarm", vmin=-2,vmax=2)
+        scatterpts = ax.scatter(offsets["X"][cut], offsets["Y"][cut], offsets["Z"][cut], c=times[cut], cmap="coolwarm", vmin=-2,vmax=2)
         ax.set_xlabel("X [m]")
         ax.set_ylabel("Y [m]")
         ax.set_zlabel("Z [m]")
@@ -49,7 +54,6 @@ for i, name in enumerate(offset_names):
 
 
     if ERRORS:
-        times = times[ np.abs(times)<5 ]
         bins = np.linspace(-2,2, 200)
         histo = np.histogram(times, bins=bins)[0]
         plt.text(x=2.4, y=65+i*30, s=labels[i]+": ")

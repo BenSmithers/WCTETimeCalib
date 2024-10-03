@@ -6,6 +6,7 @@ from math import cos, sin, pi
 import os 
 import pandas as pd 
 N_CHAN =19 
+LED_MAX = 25 
 filename = os.path.join(
     os.path.dirname(__file__),
     "..",
@@ -92,6 +93,7 @@ if __name__=="__main__":
     ax.set_ylabel("Y [m]")
     ax.set_zlabel("Z [m]")
     set_axes_equal(ax)
+    plt.savefig("../plotting/plots/geometry.png",dpi=400)
     plt.show()
 
 
@@ -150,3 +152,65 @@ def get_pmt_pos(_mPMT_id: int, _channel:int):
         filtered["Y"], 
         filtered["Z"]
     )
+
+
+
+
+
+def get_led_positions(ids=None):
+    """
+        Returns a numpy array of all the mPMT PMT _positions ()
+    """
+    if ids is None:
+        return np.transpose([
+            led_data["X"], 
+            led_data["Y"],
+            led_data["Z"]
+        ]) 
+    else:
+        return np.transpose([
+            led_data["X"][led_data["unique_id"].isin(ids)], 
+            led_data["Y"][led_data["unique_id"].isin(ids)],
+            led_data["Z"][led_data["unique_id"].isin(ids)]
+        ]) 
+    
+def get_led_dirs(ids = None):
+    if ids is None:
+        return np.transpose([
+            led_data["dx"], 
+            led_data["dy"],
+            led_data["dz"]
+        ]) 
+    else:
+        return np.transpose([
+            led_data["dx"][df["unique_id"].isin(ids)], 
+            led_data["dy"][df["unique_id"].isin(ids)],
+            led_data["dz"][df["unique_id"].isin(ids)]
+        ]) 
+
+def get_pmts_visible(led_id:int, led_max_angle=LED_MAX):
+    """
+        Returns a filter (an array of bools) for which PMTs are visible for an LED flash 
+
+        the "max angle" is half of the maximum opening angle the PMT emits light
+    """
+
+    led_max_angle_rad = led_max_angle*pi/180 
+
+    led_ar_pos = get_led_positions([led_id,])
+    led_pos = led_ar_pos[0]
+    led_dir = get_led_dirs([led_id,])[0]
+
+    pmt_pos = get_pmt_positions()
+    pmt_dir = get_pmt_dirs()
+
+
+    dvec = led_pos - pmt_pos
+
+    pmt_light_angle = np.arccos(np.sum(pmt_dir*dvec, axis=1) / np.sqrt(np.sum(dvec**2, axis=1)))
+    led_light_angle = np.arccos(np.sum(led_dir*(-1*dvec), axis=1) / np.sqrt(np.sum(dvec**2, axis=1)))
+
+
+    keep = np.logical_and(pmt_light_angle<PMT_MAX, led_light_angle < led_max_angle_rad)
+ 
+    return keep#  df[keep]["unique_id"]

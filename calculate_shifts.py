@@ -9,8 +9,8 @@ from tqdm import tqdm
     Calculates offsets relative to mPMT 0 and PMT 0
 """
 DEBUG = False 
-def refit(noise, ball_err=  BALL_ERR, mu=1):
-    from WCTECalib.geometry import df, N_CHAN, get_pmt_positions, N_MPMT
+def refit(noise,central_ball_loc=ball_pos, ball_err=  BALL_ERR, mu=1, n_flash=400):
+    from WCTECalib import df, N_CHAN, get_pmt_positions, N_MPMT
 
     print("{} - {}".format(noise, ball_err))
 
@@ -25,18 +25,18 @@ def refit(noise, ball_err=  BALL_ERR, mu=1):
     offsets = np.linspace(-155, 155, 3600)
     binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)
     all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
-    for i in tqdm(range(400)):
+    for i in tqdm(range(n_flash)):
 
 
         # ball time is offset by a bit
         # time is biased by ball error 
-        ids, t_meas, npe = sample_balltime(noise=noise, ball=ball_pos+ball_pos_err, diff_err=False, mu=mu)
+        ids, t_meas, npe = sample_balltime(noise=noise, ball=central_ball_loc+ball_pos_err, diff_err=False, mu=mu)
         positions = get_pmt_positions(ids)
 
         if 0 not in ids:
             continue
 
-        distances = np.sqrt(np.sum( (positions - ball_pos)**2 , axis=1)) #predicted distances
+        distances = np.sqrt(np.sum( (positions - central_ball_loc)**2 , axis=1)) #predicted distances
         pred_time = second*distances*N_WATER/C
         
         calculated_offset = t_meas - pred_time 
@@ -61,7 +61,7 @@ def refit(noise, ball_err=  BALL_ERR, mu=1):
     new_df["calc_offset"] = mean_offsets
 
     new_df.to_csv(
-        os.path.join(os.path.dirname(__file__), "data","calculated_offsets.csv"),
+        os.path.join(os.path.dirname(__file__), "data","calculated_offsets_lb.csv"),
         index=False
     )
     return np.array(df["unique_id"]), mean_offsets

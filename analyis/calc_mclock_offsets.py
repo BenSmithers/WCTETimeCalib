@@ -5,7 +5,7 @@ from math import log, sqrt
 import numpy as np 
 from copy import deepcopy
 from WCTECalib.utils import C, N_WATER, mm,ball_pos, second, get_color
-from WCTECalib.alt_geo import df, N_CHAN, get_pmt_positions, N_MPMT
+from WCTECalib import df, N_CHAN, get_pmt_positions, N_MPMT
 from scipy.optimize import minimize
 from tqdm import tqdm
 

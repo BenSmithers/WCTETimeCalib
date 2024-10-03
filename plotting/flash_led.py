@@ -1,5 +1,5 @@
 from WCTECalib.times import sample_leds
-from WCTECalib.geometry import get_pmt_positions, get_led_positions, get_led_dirs
+from WCTECalib import get_pmt_positions, get_led_positions, get_led_dirs
 from WCTECalib.utils import get_color, set_axes_equal
 
 import matplotlib.pyplot as plt

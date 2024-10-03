@@ -3,8 +3,7 @@
 """
 
 from WCTECalib.utils import *
-#from WCTECalib.alt_geo import get_pmts_visible, get_led_positions, 
-from WCTECalib.alt_geo import N_CHAN, N_MPMT, get_pmt_positions, df
+from WCTECalib import N_CHAN, N_MPMT, get_pmt_positions, df, get_pmts_visible, get_led_positions
 from copy import deepcopy
 import numpy as  np
 import pandas as pd 

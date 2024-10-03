@@ -1,5 +1,5 @@
 from WCTECalib.times import sample_balltime
-from WCTECalib.alt_geo import get_pmt_positions
+from WCTECalib import get_pmt_positions
 from WCTECalib.utils import C, N_WATER, set_axes_equal
 
 from WCTECalib.fitting import fit_hits 

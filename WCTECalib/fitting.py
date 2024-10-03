@@ -1,7 +1,7 @@
 
 
 from WCTECalib.utils import C, N_WATER
-from WCTECalib.geometry import get_pmt_positions
+from WCTECalib import get_pmt_positions
 
 import numpy as np 
 from scipy.optimize import minimize, basinhopping
@@ -20,7 +20,7 @@ offset_dict = pd.read_csv(
     os.path.join(os.path.dirname(__file__),
     "..",
     "data",
-    "calculated_offsets.csv")
+    "calculated_offsets_lbmc.csv")
 )
 pmt_pos = np.transpose([
         offset_dict["X"], 

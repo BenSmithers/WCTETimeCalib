@@ -4,7 +4,7 @@ import json
 import numpy as np 
 from copy import deepcopy
 from WCTECalib.utils import C, N_WATER, mm,ball_pos, second
-from WCTECalib.alt_geo import df, N_CHAN, get_pmt_positions, N_MPMT
+from WCTECalib import df, N_CHAN, get_pmt_positions, N_MPMT
 from tqdm import tqdm 
 from scipy.signal import find_peaks
 from scipy.optimize import minimize

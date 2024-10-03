@@ -3,7 +3,7 @@
 from calculate_shifts import refit
 from WCTECalib.fitting import fit_hits
 from WCTECalib.utils import mm, N_WATER, C
-from WCTECalib.geometry import get_pmt_positions
+from WCTECalib import get_pmt_positions
 from WCTECalib.times import sample_balltime
 
 import numpy as np

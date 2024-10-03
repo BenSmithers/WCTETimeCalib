@@ -1,5 +1,5 @@
 from WCTECalib.times import generate_offsets, sample_balltime
-from WCTECalib.geometry_old import N_MPMT
+from WCTECalib import N_MPMT
 from WCTECalib.utils import C, N_WATER, set_axes_equal
 
 from WCTECalib.fitting import fit_ball as ballfit 
@@ -13,10 +13,10 @@ random_rsq = np.random.rand()*(1.9**2)
 radii = np.sqrt(random_rsq)
 random_angle = np.random.rand()*2*pi 
 
-xs = np.cos(random_angle)*radii
-ys = np.sin(random_angle)*radii
-zs = np.random.rand()*3 
 
+xs = np.cos(random_angle)*radii
+zs = np.sin(random_angle)*radii
+ys = np.random.rand()*2 - 0.5
 figs, axes = plt.subplots()
 axes.set_ylim([-9,9])
 
@@ -37,7 +37,6 @@ n_diffs = len(np.array(offset_dict["X"]))
 
 
 def sample(): 
-    #otimes = sample_balltime(ball= np.array([xs, ys, zs]))
     otimes = sample_balltime() #ball= np.array([0.1,0.5 , 0.2]))
     fit = ballfit(otimes)
 

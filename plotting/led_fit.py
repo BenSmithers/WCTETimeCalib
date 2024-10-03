@@ -1,5 +1,5 @@
 from WCTECalib.times import sample_leds
-from WCTECalib.geometry import  get_led_positions, get_led_dirs, get_pmt_positions
+from WCTECalib import  get_led_positions, get_led_dirs, get_pmt_positions
 from WCTECalib.fitting import fit_hits
 from WCTECalib.utils import N_WATER, C
 

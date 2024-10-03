@@ -1,7 +1,7 @@
 from WCTECalib.times import generate_offsets, sample_balltime, DIFFUSER_ERR, BALL_ERR, mm, ns
 from calculate_shifts import refit 
 from WCTECalib.utils import get_color
-from WCTECalib.geometry import N_CHAN, N_MPMT
+from WCTECalib import N_CHAN, N_MPMT
 
 import pandas as pd
 import os 
@@ -57,5 +57,5 @@ plt.plot([],[],color=get_color(0+1,4,"viridis" ), label="mu={}pe".format(intensi
 plt.plot([],[],color=get_color(1+1,4 ,"viridis"), label="mu={}pe".format(intensity[1]))
 plt.plot([],[],color=get_color(2+1,4 ,"viridis"), label="mu={}pe".format(intensity[2]))
 plt.legend()
-plt.savefig("./plots/offset_error.png",dpi=400)
+plt.savefig("./plots/mpmt_offset_error.png",dpi=400)
 plt.show()

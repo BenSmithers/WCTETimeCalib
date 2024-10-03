@@ -1,7 +1,7 @@
 import pandas as pd 
 import os 
 import numpy as np 
-from WCTECalib.geometry import N_MPMT, N_CHAN, get_led_positions, get_pmt_positions
+from WCTECalib import N_MPMT, N_CHAN, get_led_positions, get_pmt_positions
 from WCTECalib.utils import N_WATER, C, convert_to_2d_offset, NOISE_SCALE
 from WCTECalib.times import second, sample_leds
 from copy import deepcopy
@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 DEBUG = False 
 
 def refit(noise, mu=1):
-    from WCTECalib.geometry import df
+    from WCTECalib import df
 
     n_flash = 40
     n_led = 306 
