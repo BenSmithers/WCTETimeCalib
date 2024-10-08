@@ -8,17 +8,18 @@ from WCTECalib.utils import C, N_WATER, mm,ball_pos, second, get_color
 from WCTECalib import df, N_CHAN, get_pmt_positions, N_MPMT
 from scipy.optimize import minimize
 from tqdm import tqdm
+from scipy.signal import find_peaks
 
 pmt_no = 0
-outfile = os.path.join(
+infile = os.path.join(
     os.path.dirname(__file__),
     "..",
     "data",
-    "wcsim_offset_lock.json"
+    "wcsim_offset_swing.json"
 )
 
 PHASELOCK = 200000.0# 0.005
-outname = os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lock.csv")
+outname = os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lock_swing.csv")
 
 print(PHASELOCK)
 maxtime = min([600, PHASELOCK])
@@ -32,7 +33,7 @@ print(N_CHAN*N_MPMT)
 all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
 
 #simulation result
-_obj = open(outfile, 'rt')
+_obj = open(infile, 'rt')
 data = json.load(_obj)
 _obj.close()
 
@@ -60,11 +61,11 @@ for flash_id  in tqdm(range(n_flash)):
 
 
 all_times = []
+peak_widths=[]
 metrics = []
 num_bad = 0
 called_once = False
 print("... fitting distributions")
-highlight =[1151.0, 1644.0, 1645.0, 1646.0, 1682.0, 1705.0, 1739.0]
 for i in tqdm(range(len(all_bins))):
 
     this_wave = all_bins[i]/np.sum(all_bins[i])
@@ -89,8 +90,14 @@ for i in tqdm(range(len(all_bins))):
     cfd_time = res.x[1] 
     all_times.append(cfd_time)
     this_met = metric(res.x)
+    peak_widths.append(10**res.x[2])
     metrics.append(this_met)
-    if  (i+1) in highlight:
+
+    stepsize = offsets[1]-offsets[0]
+    distance = 7./stepsize
+
+    tpeak = find_peaks(this_wave, 0.4*np.max(this_wave), distance=distance)[0]
+    if  len(tpeak)>1:
         called_once = True
         xfine = np.linspace(0, PHASELOCK, 3000)
         yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
@@ -129,6 +136,7 @@ all_times = np.array(all_times) -pred_time
 new_df = deepcopy(df)
 
 new_df["calc_offset"] = all_times[0] - all_times
+new_df["offset_sigma"] = peak_widths
 
 new_df.to_csv(
     outname,

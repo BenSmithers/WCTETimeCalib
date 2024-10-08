@@ -9,33 +9,35 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 from scipy.optimize import minimize
 from random import choice 
-from math import sqrt,log
+
 DEBUG =True
 
 central_ball_loc = ball_pos
 
-outfile = os.path.join(
+infile = os.path.join(
     os.path.dirname(__file__),
     "..",
     "data",
-    "wcsim_offset_recluster.json"
+    "wcsim_offset_swing.json"
 )
+
 
 offsets = np.linspace(-180, 180, 720)
 offset_center = 0.5*(offsets[1:] + offsets[:-1])
 binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)+1 
 all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
 
-
 #simulation result
-_obj = open(outfile, 'rt')
+_obj = open(infile, 'rt')
 data = json.load(_obj)
 _obj.close()
 
 n_flash = len(data["times"])
 
 print("... Collecting hits")
-for flash_id  in range(n_flash):
+for flash_id  in tqdm(range(n_flash)):
+    if flash_id>2000:
+        break
     # ids in the data files are off by 1 relative to the geo file
     _ids = np.array(data["pmtid"][flash_id])+1
     if 1 not in _ids:
@@ -67,8 +69,10 @@ for flash_id  in range(n_flash):
 
     all_bins += np.histogram2d(_ids, _t_meas, bins=(binids, offsets))[0]
 
+peaks = []
+peak_width = []
+
 if DEBUG:
-    peaks = []
     import matplotlib.pyplot as plt
     from WCTECalib.utils import get_color 
 
@@ -76,7 +80,6 @@ metrics = []
 print("... fitting hits")
 nplot = 0
 
-highlight = [1036.0, 1076.0, 1097.0, 1150.0, 1151.0, 1193.0, 1226.0, 1644.0, 1645.0, 1646.0, 1662.0, 1665.0, 1704.0, 1705.0, 1706.0, 1741.0, 1757.0, 1777.0, 1795.0, 1805.0, 1817.0]
 
 for id in tqdm(range(len(all_bins))):
     this_wave = all_bins[id]/np.sum(all_bins[id])
@@ -86,11 +89,11 @@ for id in tqdm(range(len(all_bins))):
         presum =(this_wave - params[0]*np.exp(-0.5*((offset_center - params[1])/sigma)**2))**2
         return np.sum(presum)
 
-    x0 = (max(this_wave), offset_center[np.argmax(this_wave)], -1)
+    x0 = (max(this_wave), offset_center[np.argmax(this_wave)], 1)
     bounds = [
                 (0, np.inf),
                 (-180, 180),
-                (-5, 1)
+                (-5, 2)
             ]
     options={
         "eps":1e-5,
@@ -102,15 +105,21 @@ for id in tqdm(range(len(all_bins))):
     cfd_time = res.x[1] 
     goodness = metric(res.x)
     metrics.append(goodness)
+    stepsize = offsets[1]-offsets[0]
+    distance = 7./stepsize
 
-    if (id+1) in highlight:
+    tpeak = find_peaks(this_wave, 0.4*np.max(this_wave), distance=distance)[0]
+
+
+    if len(tpeak)>1:
         plt.stairs(this_wave + nplot*0.025+0.001, offsets+0.5, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
-        plt.stairs(this_wave + nplot*0.025, offsets, color=get_color(nplot/len(highlight), 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
+        plt.stairs(this_wave + nplot*0.025, offsets, color=get_color(id/len(all_bins), 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
         xfine = np.linspace(min(offset_center), max(offset_center), 3000)
         yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
         plt.plot(xfine, yfine+ nplot*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-nplot+0.25)
         nplot+=1
     peaks.append(cfd_time)
+    peak_width.append(10**res.x[2])
 
 
 plt.title("Various PMTs", size=14)
@@ -141,9 +150,10 @@ use_offsets = np.array(peaks)-pred_time
 new_df = deepcopy(df)
 
 new_df["calc_offset"] = use_offsets[0]-use_offsets
+new_df["offset_sigma"] = peak_width
 
 new_df.to_csv(
-    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lbmc.csv"),
+    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lbmc_swing.csv"),
     index=False
 )
 #np.array(df["unique_id"]), mean_offsets
