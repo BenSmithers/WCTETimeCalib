@@ -8,12 +8,17 @@ import pandas as pd
 from math import pi 
 import os 
 from WCTECalib.utils import set_axes_equal, C, N_WATER
+import json 
 from Geometry.WCD import WCD
 N_CHAN = 19
 PMT_MAX = 85*pi/180
 LED_MAX = 25 #*pi/180
 
 wcte = WCD("wcte", kind="WCTE")
+
+_obj = open(os.path.join(os.path.dirname(__file__),"geodata", "modulo_dump.json"), 'rt')
+geodata = json.load(_obj)['data']
+_obj.close()
 
 geo_file = os.path.join(os.path.dirname(__file__), "..","data", "geometry.csv")
 led_file = os.path.join(os.path.dirname(__file__), "..","data", "leds.csv")
@@ -62,9 +67,21 @@ else:
     _feeds = []
 
     for im, mpmt in enumerate(wcte.mpmts):
+
+
+        # let's make the mpmtID/channel map 
+        if geodata[im]["MPMTIN"] is None:
+            continue
+        
         loc = mpmt.get_xy_points('design','feedthrough', wcte)
         _feeds.append(loc)
 
+        # this does pmt->channel, we want the opposite 
+        pmt_to_chan = geodata[im]["channel_mapping"]
+        chan_to_pmt = {}
+        for pmt_number in range(19):
+            channel_number = int(pmt_to_chan["pmt_"+str(pmt_number)+"_chan_id"])
+            chan_to_pmt[channel_number]=pmt_number
 
         for iled in range(3):
             if len( mpmt.leds)==0:
@@ -83,8 +100,7 @@ else:
             _dirs.append(fix_cord(pdata["direction_z"]))
             _mPMT_id.append(im)
             _channel.append(ip)
-            _unique_id.append(_unique_id_count)
-            _unique_id_count+=1
+            _unique_id.append(im*19 + ip)
 
     _positions = np.transpose(_positions) 
     _dirs = np.transpose(_dirs)
@@ -92,7 +108,6 @@ else:
     _led_dir = np.transpose(_led_dir)
     _feeds = np.transpose(_feeds)/1000
     N_MPMT = im+1
-    print(N_MPMT)
 
     _data = np.transpose([
         _unique_id, 
@@ -109,7 +124,7 @@ else:
 
 
     df = pd.DataFrame(
-        columns = ["unique_id", "mPMT", "Chan", "X", "Y", "Z", "dx", "dy", "dz"],
+        columns = ["unique_id", "mPMT_slot_id", "Chan", "X", "Y", "Z", "dx", "dy", "dz"],
         data = _data
     )
 
