@@ -18,11 +18,11 @@ infile = os.path.join(
     os.path.dirname(__file__),
     "..",
     "data",
-    "wcsim_offset_swing.json"
+    "laserball_realdata_events.json"
 )
 
 
-offsets = np.linspace(-180, 180, 720)
+offsets = np.linspace(-180*20, 180*20, 720*20)
 offset_center = 0.5*(offsets[1:] + offsets[:-1])
 binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)+1 
 all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
@@ -33,14 +33,16 @@ data = json.load(_obj)
 _obj.close()
 
 n_flash = len(data["times"])
-
+reference_id = -1 
 print("... Collecting hits")
+print("Reference PMT - ".format(reference_id))
 for flash_id  in tqdm(range(n_flash)):
-    if flash_id>2000:
-        break
+
     # ids in the data files are off by 1 relative to the geo file
     _ids = np.array(data["pmtid"][flash_id])+1
-    if 1 not in _ids:
+    if reference_id==-1:
+        reference_id = _ids[0]
+    if reference_id not in _ids:
         continue
     _t_meas= np.array(data["times"][flash_id])
     _charge = np.array(data["charge"][flash_id])
@@ -58,7 +60,7 @@ for flash_id  in tqdm(range(n_flash)):
             t_meas.append(entry[1])
     t_meas = np.array(t_meas)
     ids = np.array(ids)
-    bin_where = choice(np.argwhere(ids==1))
+    bin_where = choice(np.argwhere(ids==reference_id))
 
 
     _t_meas = _t_meas - t_meas[bin_where] 
@@ -79,10 +81,13 @@ if DEBUG:
 metrics = []
 print("... fitting hits")
 nplot = 0
-
+maxplot = 20
 
 for id in tqdm(range(len(all_bins))):
     this_wave = all_bins[id]/np.sum(all_bins[id])
+    if np.sum(this_wave)==0:
+        peaks.append(np.nan)
+        peak_width.append(np.nan)
     def metric(params):
         sigma = 10**params[2]
 
@@ -110,13 +115,19 @@ for id in tqdm(range(len(all_bins))):
 
     tpeak = find_peaks(this_wave, 0.4*np.max(this_wave), distance=distance)[0]
 
+    
+    shiftval = np.nansum(this_wave*offset_center)/np.nansum(this_wave)
+    if nplot<maxplot and shiftval>1e-8:
+        
+        
+        print(shiftval)
+        plt.stairs(this_wave + nplot*0.025, offsets-shiftval, color=get_color(nplot/maxplot, 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
+        plt.stairs(this_wave + nplot*0.025+0.001, offsets+0.5 - shiftval, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
+        
 
-    if len(tpeak)>1:
-        plt.stairs(this_wave + nplot*0.025+0.001, offsets+0.5, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
-        plt.stairs(this_wave + nplot*0.025, offsets, color=get_color(id/len(all_bins), 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
         xfine = np.linspace(min(offset_center), max(offset_center), 3000)
         yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
-        plt.plot(xfine, yfine+ nplot*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-nplot+0.25)
+        #plt.plot(xfine, yfine+ nplot*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-nplot+0.25)
         nplot+=1
     peaks.append(cfd_time)
     peak_width.append(10**res.x[2])
@@ -125,13 +136,11 @@ for id in tqdm(range(len(all_bins))):
 plt.title("Various PMTs", size=14)
 plt.xlabel("Earliest Relative Hit Time [ns]", size=14)
 plt.ylabel("Arb. Units",size=14)
-plt.xlim([-40,60])
-plt.ylim([0, 0.55])
 plt.savefig(os.path.join(os.path.dirname(__file__), "..","plotting","plots","raw_offset_distribution.png"), dpi=400)
 plt.show()
 plt.clf()
 
-bins =np.linspace( np.min(metrics), np.max(metrics), 100)
+bins =np.linspace( np.nanmin(metrics), np.nanmax(metrics), 100)
 binned_met = np.histogram(metrics, bins)
 plt.stairs(binned_met[0], bins)
 plt.xlabel("Fit Metric", size=14)
@@ -149,11 +158,11 @@ use_offsets = np.array(peaks)-pred_time
 
 new_df = deepcopy(df)
 
-new_df["calc_offset"] = use_offsets[0]-use_offsets
+new_df["calc_offset"] = use_offsets
 new_df["offset_sigma"] = peak_width
 
 new_df.to_csv(
-    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_lbmc_swing.csv"),
+    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_realdata.csv"),
     index=False
 )
 #np.array(df["unique_id"]), mean_offsets
