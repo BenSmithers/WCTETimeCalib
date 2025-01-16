@@ -8,8 +8,8 @@
 
 const double ns = 1.0;
 const double coarse = 8.0*ns;
-const double TIME_WINDOW = 1200*ns; 
-const int THRESH = 200;
+const double TIME_WINDOW = 450*ns; 
+const int THRESH = 400;
 
 double time_base = -1;
 
@@ -76,24 +76,29 @@ int main(){
     int max_index=1;
     int n_in_range = 0;
 
-    while(times[max_index] - times[min_index]<TIME_WINDOW){
+    // first, we slide the max index over until the time is greater than the time window 
+    while((times[max_index] - times[min_index])<TIME_WINDOW){
         if(max_index>times.size()-1){
+            max_index -= 1; // shift it back over so that max index is in the window
             break; 
         }else{
             max_index++;
         }
     }
 
-    n_in_range = max_index - min_index + 1;
+    n_in_range = max_index - min_index+1; 
 
+    // if there are already enough hits then we assign all of these to the first event 
     if(n_in_range>THRESH){
-        for(int index=0; index<=max_index; index++){
-            event_id[index] = 0;
+        // the max
+        for(int index=0; index<max_index; index++){
+            event_id[index] = event_counter;
         }
         in_event = true;
     }
+    uint index = 0;
+    while(index<times.size()){
 
-    for(int index = 0; index<times.size(); index++){
         // update the lower and upper bounds 
 
         // while the min index is low enough that we look at a non-valid one, step it up!
@@ -107,18 +112,25 @@ int main(){
                 min_index++;
             }
         }
+        // min_index is now the earliest hit that is still in the window 
 
         // as we scan to the right, any we add while already in an event need to be added to the current event 
         while((times[max_index] - times[index])<TIME_WINDOW){
             if(max_index>times.size()-1){
                 break; 
             }else{
-                max_index++;
+                // if we're in an event then we will need to assign this new index to the currently considered event 
                 if(in_event){
                     to_assign.push_back(max_index);
                 }
+                // after that, we step the index forward! 
+                max_index++;
+                
             }
         }
+        // max index is large enough to be invalid, so let's shift it over 
+        max_index -=1;
+
         if(min_index>index){
             min_index=index;
         }
@@ -137,7 +149,12 @@ int main(){
             Otherwise, we signal the exit of an event
 
         */
-        n_in_range = max_index - min_index;
+        n_in_range = max_index - min_index+1;
+        if (max_index>index){
+            index = max_index;
+        }else{
+            index ++;
+        }
         if (n_in_range>THRESH){
             if(in_event){
                 // only assign the newest values 
@@ -145,17 +162,24 @@ int main(){
                     event_id[to_assign[i]] = event_counter;
                 }
             }else{
-                std::cout<<"Found event"<<std::endl;
+                
                 in_event = true;
                 event_counter++;
-                for(int i=min_index; i<max_index+1; i++){
+                std::cout<<"Found event " << event_counter<<std::endl;
+                for(int i=min_index; i<=max_index; i++){
                     event_id[i] = event_counter;
                 }
             }
         }else{
+            if (in_event){
+                // we may have just exited an event... so we might need to assign things 
+                for(int i=0; i<to_assign.size();i++){
+                    event_id[to_assign[i]] = event_counter;
+                }
+            }
             in_event = false;
         }
-
+        
         to_assign.clear();
     }
 
@@ -191,7 +215,7 @@ int main(){
         }
     }
 
-    std::cout<<"counted "<<nhits<<" hits in events"<<std::endl;
+    std::cout<<"counted "<<nhits<<" hits in "<<last_event_id<<" events"<<std::endl;
 
     return 0;
 }
