@@ -8,7 +8,7 @@
 
 const double ns = 1.0;
 const double coarse = 8.0*ns;
-const double TIME_WINDOW = 450*ns; 
+const double TIME_WINDOW = 450; 
 const int THRESH = 400;
 
 double time_base = -1;
@@ -41,7 +41,7 @@ void loadCSVData(
         if (std::getline(lineStream, cell, ',')) value4 = std::stod(cell);
         else throw std::runtime_error("Error: Invalid data in column 4");
 
-        column1.push_back(value1);
+        column1.push_back(value1*coarse); // added this in to convert the saved coarse-counters into full-on ns times
         column2.push_back(value2);
         column3.push_back(value3);
         column4.push_back(value4);

@@ -4,7 +4,7 @@ import sys
 import os 
 import json 
 from glob import glob 
-
+from cfd.do_cfd import do_cfd
 NS = 1.0 
 COUNTERS = 8*NS
 
@@ -33,18 +33,30 @@ def reader(filename):
 
     all_files = glob(filename)
     all_files = sorted(all_files)
-    print(all_files)
     for fn in all_files:
         print("Reading File {}".format(fn))
         data = pd.read_parquet(fn)
+        
+        print("Extracting Waveforms")
+        waveforms = []
+        oldmask = []
+        for wave in data["samples"]:
+            if len(wave)==32:
+                waveforms.append(wave)
+                #plt.bar(range(32),wave, alpha=0.1, color='k') 
+                oldmask.append(True)
+            else:
+                oldmask.append(False)
+        waveforms=-1*np.array(waveforms)
+        times, amplitudes,baseline = do_cfd(waveforms)
+        fine_time += times.tolist()
+        charge += amplitudes.tolist()
 
-        card += np.array(data["card_id"][:]).tolist()
-        channel += np.array(data["chan"][:]).tolist()
-        charge += np.array(data["charge"][:]).tolist()
-        fine_time += np.array(data["fine_time"][:]).tolist()
-        coarse += np.array(data["coarse"][:]).tolist()
+        card += np.array(data["card_id"][oldmask]).tolist()
+        channel += np.array(data["chan"][oldmask]).tolist()
+        #charge += np.array(data["charge"][:]).tolist()
+        coarse += np.array(data["coarse"][oldmask]).tolist()
 
-        print(len(coarse), "hits")
 
     card = np.array(card)
     channel= np.array(channel)
@@ -57,14 +69,15 @@ def reader(filename):
     card = card[mask]
     channel = channel[mask]
     charge = np.array(charge)[mask]
+    
     fine_time = np.array(fine_time)[mask]
     coarse = np.array(coarse)[mask]
 
     slot_id, pmt_pos = get_info(card, channel)
 
-    time = (coarse*8 +  fine_time/8196.)
+    time =  (coarse +  fine_time)
     time = time - np.min(time)
-    mask = charge>30
+    mask = np.logical_not(np.isnan(charge))
 
     print(np.shape(time))
     

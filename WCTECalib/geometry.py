@@ -228,7 +228,8 @@ def get_led_dirs(ids = None):
             led_data["dy"][df["unique_id"].isin(ids)],
             led_data["dz"][df["unique_id"].isin(ids)]
         ]) 
-
+def get_mask(ids):
+    return df["unique_id"].isin(ids)
 
 def get_pmt_positions(ids=None):
     """

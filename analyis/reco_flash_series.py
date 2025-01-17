@@ -5,6 +5,7 @@
 import os 
 from WCTECalib.fitting import fit_hits, get_pmt_positions
 from WCTECalib.utils import N_WATER,C, get_color, set_axes_equal
+from WCTECalib import df
 import json 
 import numpy as np
 from math import sqrt 
@@ -12,14 +13,17 @@ from tqdm import tqdm
 import pandas as pd 
 from scipy.optimize import basinhopping 
 
+from event_process import process
+
 import matplotlib.pyplot as plt 
+import h5py as h5 
 DEBUG = False
 
 offset_dict = pd.read_csv(
     os.path.join(os.path.dirname(__file__),
     "..",
     "data",
-    "calculated_offsets_lbmc.csv")
+    "calculated_offsets_realdata.csv")
 )
 
 
@@ -27,83 +31,72 @@ infile = os.path.join(
     os.path.dirname(__file__),
     "..",
     "data",
-    "wcsim_offset_swing.json"
+    "laserball_realdata_events.h5"
 )
-all_pos = get_pmt_positions()
+
 all_off =  np.array(offset_dict["calc_offset"])
 
 all_radii = []
 
-#simulation result
-_obj = open(infile, 'rt')
-data = json.load(_obj)
-_obj.close()
+data = h5.File(infile)
 
-n_flash = len(data["times"])
+n_flash = len(data.keys())
 
 
+reference_id = 25
 
-for flash_id in tqdm(range(n_flash)):
+for _flash_id in tqdm(range(n_flash)):
+    flash_id = _flash_id+1
+    if flash_id>1000:
+        break
 
-    _ids = np.array(data["pmtid"][flash_id])+1
-    _t_meas= np.array(data["times"][flash_id])
+    ids, times, charge = process(data["event{}".format(flash_id)])    
+
+    #print("To {} times, ranging {}  to {}".format(len(t_meas), t_meas.min(), t_meas.max()))
     
 
-    if False:
-        window = 20
-        options= {
-            "eps":1,
-            "gtol":1e-5,
-        }
-        def this_met(params):
-            mask = np.abs(_t_meas - params[0])<window 
-            return -1*np.sum(mask.astype(int))
-        x0 = [np.nanmean(_t_meas)]
-        hitres = basinhopping(this_met, x0=x0, niter=10, minimizer_kwargs={"options":options}).x 
-        if this_met(hitres)==0:
-            continue
-
-        mask = np.abs(_t_meas - hitres[0])<window 
-        _ids = _ids[mask]
-        _t_meas = _t_meas[mask]
-
-    these_data = np.array([_ids, _t_meas]).T 
-    these_data = np.array(sorted(these_data, key=lambda x:x[1] ))
-
-    ids = []
-    t_meas = []
-    for entry in these_data:
-        if entry[0] not in ids:
-            ids.append(entry[0])
-            t_meas.append(entry[1])
-    t_meas = np.array(t_meas)
-    ids = np.array(ids).astype(int)
+    bins = np.linspace(np.nanmean(times)-30, np.nanmean(times)+30)
 
 
-
-
-    vector = fit_hits(ids, t_meas)
+    vector = fit_hits(ids, times)
     all_radii.append(sqrt(np.sum(vector[:3]**2)))
 
     if DEBUG:
-        these_pos = all_pos[ids -1]
-        distances = np.sqrt(np.sum((all_pos - vector[0:3])**2, axis=1))
-        times = (1e9)*distances*N_WATER/C 
 
-        offset_adj = t_meas + all_off[ids - 1] - vector[3]
-        print("{} - {} mean {}".format(min(offset_adj), max(offset_adj), np.mean(offset_adj)))
+        mpmt_no = ids // 19
+        channel = ids % 19
 
+        stacked = np.zeros(len(bins)-1)
+        zthis = 100
 
-        ftime = vector[3] 
-        mtime = -10
-        matime = ftime+30
-        colors = get_color( (offset_adj-mtime)/(40), 1)
+        for mpmt in np.unique(mpmt_no):
+            binned = np.histogram((times)[mpmt_no==mpmt], bins, )[0] 
+            plt.stairs(binned+stacked, bins, zorder= zthis, color=get_color(zthis, 100, "jet"), fill=True)
+            zthis -= 1
+            stacked += binned
+            if zthis<0:
+                break
 
+        plt.xlabel("Hit Time [ns]")
+        plt.show()
+
+        these_pos = get_pmt_positions(ids)
+        distances = np.sqrt(np.sum((these_pos - vector[0:3])**2, axis=1))
+
+        calc_time = (1e9)*distances*N_WATER/C 
+        #print("offset time", vector[3])
+        offset_adj = times -calc_time - vector[3] 
+
+        #print("time range {} - {}".format(min(offset_adj), max(offset_adj)))
+
+        #colors = get_color( (offset_adj-np.mean(offset_adj))/(400), 1)
+        colors = times -calc_time - vector[3] 
+        
         ax = plt.axes(projection="3d")
-        ax.scatter(these_pos.T[0], these_pos.T[1], these_pos.T[2], color=colors)
+        scatty = ax.scatter(these_pos.T[0], these_pos.T[1], these_pos.T[2], c=colors,vmin=-5, vmax=5, cmap=plt.cm.inferno)
         #ax.plot(xs, ys, zs, 'bo')
         ax.plot(vector[0], vector[1], vector[2], 'rd')
-
+        plt.colorbar(scatty, ax=ax)
         ax.set_xlabel("X [m]")
         ax.set_ylabel("Y [m]")
         ax.set_zlabel("Z [m]")
