@@ -12,11 +12,16 @@ data = np.loadtxt(target, delimiter=",", skiprows=1).transpose()
 hit_id = data[0][:]
 all_times = data[1][:]
 charge = data[2][:]
-slot= data[3][:]
+slot= data[3][:] -1
 channel = data[4][:]
 event = data[5]
 
+# MIN SLOT IS 1 
+print("Slots {} - {}".format(np.min(slot), np.max(slot)))
+print("Channels {} - {}".format(np.min(channel), np.max(channel)))
 pmt_id = 19*slot + channel 
+
+print("{} - {}".format(np.min(pmt_id), np.max(pmt_id)))
 
 save_data = {
         "times":[], 

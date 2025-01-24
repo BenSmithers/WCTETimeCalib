@@ -8,10 +8,12 @@
 
 const double ns = 1.0;
 const double coarse = 8.0*ns;
-const double TIME_WINDOW = 450; 
-const int THRESH = 400;
+const double TIME_WINDOW = 1000; 
+const int THRESH = 200;
 
 double time_base = -1;
+
+bool trigmode = true;
 
 void loadCSVData(
     const std::string& filename,
@@ -72,117 +74,122 @@ int main(){
         event_id.push_back(-1);
     }
 
-    int min_index=0;
-    int max_index=1;
-    int n_in_range = 0;
+    if (trigmode){
 
-    // first, we slide the max index over until the time is greater than the time window 
-    while((times[max_index] - times[min_index])<TIME_WINDOW){
-        if(max_index>times.size()-1){
-            max_index -= 1; // shift it back over so that max index is in the window
-            break; 
-        }else{
-            max_index++;
-        }
-    }
+        int min_index=0;
+        int max_index=1;
+        int n_in_range = 0;
 
-    n_in_range = max_index - min_index+1; 
-
-    // if there are already enough hits then we assign all of these to the first event 
-    if(n_in_range>THRESH){
-        // the max
-        for(int index=0; index<max_index; index++){
-            event_id[index] = event_counter;
-        }
-        in_event = true;
-    }
-    uint index = 0;
-    while(index<times.size()){
-
-        // update the lower and upper bounds 
-
-        // while the min index is low enough that we look at a non-valid one, step it up!
-        while((times[index] - times[min_index])>TIME_WINDOW){
-            if(index==min_index){
-                break;
-            }
-            if(min_index>times.size()-1){
-                break; 
-            }else{
-                min_index++;
-            }
-        }
-        // min_index is now the earliest hit that is still in the window 
-
-        // as we scan to the right, any we add while already in an event need to be added to the current event 
-        while((times[max_index] - times[index])<TIME_WINDOW){
+        // first, we slide the max index over until the time is greater than the time window 
+        while((times[max_index] - times[min_index])<TIME_WINDOW){
             if(max_index>times.size()-1){
+                max_index -= 1; // shift it back over so that max index is in the window
                 break; 
             }else{
-                // if we're in an event then we will need to assign this new index to the currently considered event 
-                if(in_event){
-                    to_assign.push_back(max_index);
-                }
-                // after that, we step the index forward! 
                 max_index++;
-                
             }
         }
-        // max index is large enough to be invalid, so let's shift it over 
-        max_index -=1;
 
-        if(min_index>index){
-            min_index=index;
-        }
-        if(max_index<index){
-            max_index=index;
-        }
-        
-        // are there enough hits to call this an event. 
-        /*
-            We check the number of hits around this one
-            If we're above the threshold,
-                we check if we're already in an event 
-                    And if so, then we add the newly scanned hits to this one
-                    otherwise, we have to iterate the event counter and assign all of the hits 
+        n_in_range = max_index - min_index+1; 
 
-            Otherwise, we signal the exit of an event
-
-        */
-        n_in_range = max_index - min_index+1;
-        if (max_index>index){
-            index = max_index;
-        }else{
-            index ++;
+        // if there are already enough hits then we assign all of these to the first event 
+        if(n_in_range>THRESH){
+            // the max
+            for(int index=0; index<max_index; index++){
+                event_id[index] = event_counter;
+            }
+            in_event = true;
         }
-        if (n_in_range>THRESH){
-            if(in_event){
-                // only assign the newest values 
-                for(int i=0; i<to_assign.size();i++){
-                    event_id[to_assign[i]] = event_counter;
+        uint index = 0;
+        while(index<times.size()){
+
+            // update the lower and upper bounds 
+
+            // while the min index is low enough that we look at a non-valid one, step it up!
+            while((times[index] - times[min_index])>TIME_WINDOW){
+                if(index==min_index){
+                    break;
+                }
+                if(min_index>times.size()-1){
+                    break; 
+                }else{
+                    min_index++;
+                }
+            }
+            // min_index is now the earliest hit that is still in the window 
+
+            // as we scan to the right, any we add while already in an event need to be added to the current event 
+            while((times[max_index] - times[index])<TIME_WINDOW){
+                if(max_index>times.size()-1){
+                    break; 
+                }else{
+                    // if we're in an event then we will need to assign this new index to the currently considered event 
+                    if(in_event){
+                        to_assign.push_back(max_index);
+                    }
+                    // after that, we step the index forward! 
+                    max_index++;
+                    
+                }
+            }
+            // max index is large enough to be invalid, so let's shift it over 
+            max_index -=1;
+
+            if(min_index>index){
+                min_index=index;
+            }
+            if(max_index<index){
+                max_index=index;
+            }
+            
+            // are there enough hits to call this an event. 
+            /*
+                We check the number of hits around this one
+                If we're above the threshold,
+                    we check if we're already in an event 
+                        And if so, then we add the newly scanned hits to this one
+                        otherwise, we have to iterate the event counter and assign all of the hits 
+
+                Otherwise, we signal the exit of an event
+
+            */
+            n_in_range = max_index - min_index+1;
+            if (max_index>index){
+                index = max_index;
+            }else{
+                index ++;
+            }
+            if (n_in_range>THRESH){
+                if(in_event){
+                    // only assign the newest values 
+                    for(int i=0; i<to_assign.size();i++){
+                        event_id[to_assign[i]] = event_counter;
+                    }
+                }else{
+                    
+                    in_event = true;
+                    event_counter++;
+                    std::cout<<"Found event " << event_counter<<std::endl;
+                    for(int i=min_index; i<=max_index; i++){
+                        event_id[i] = event_counter;
+                    }
                 }
             }else{
-                
-                in_event = true;
-                event_counter++;
-                std::cout<<"Found event " << event_counter<<std::endl;
-                for(int i=min_index; i<=max_index; i++){
-                    event_id[i] = event_counter;
+                if (in_event){
+                    // we may have just exited an event... so we might need to assign things 
+                    for(int i=0; i<to_assign.size();i++){
+                        event_id[to_assign[i]] = event_counter;
+                    }
                 }
+                in_event = false;
             }
-        }else{
-            if (in_event){
-                // we may have just exited an event... so we might need to assign things 
-                for(int i=0; i<to_assign.size();i++){
-                    event_id[to_assign[i]] = event_counter;
-                }
-            }
-            in_event = false;
+            
+            to_assign.clear();
         }
-        
-        to_assign.clear();
-    }
 
+        
+    }
+    
     std::cout <<"Saving events file"<<std::endl;
     std::ofstream file("./events.csv");
     file << "Hit no, time, charge, slot, channel, event" <<std::endl;;
@@ -191,28 +198,45 @@ int main(){
     int last_event_id = -1;
 
     for(int i=0; i<times.size(); i++){
+        if(!trigmode && event_id[i]==-1){
+            continue;
+        }
         if(event_id[i]==-1){
             continue;
-        }else{
+        }
+        if(!trigmode){
             if(last_event_id!=event_id[i]){
                 time_base = times[i];
                 }
             last_event_id = event_id[i];
-
-            nhits++;
-            file<<i;
-            file<<", ";
-            file<<times[i]-time_base;
-            file<<", ";
-            file<<charges[i];
-            file<<", ";
-            file<<slot[i];
-            file<<", ";
-            file<<channel[i];
-            file<<", ";
-            file<<event_id[i];
-            file<<std::endl;
         }
+        if(trigmode){
+            if (channel[i]==131){
+                // new event! 
+                time_base = times[i];
+                last_event_id++;
+                continue;
+            }
+            if(last_event_id==-1){
+                continue;
+            }
+            event_id[i] = last_event_id;
+        }        
+
+        nhits++;
+        file<<i;
+        file<<", ";
+        file<<times[i]-time_base;
+        file<<", ";
+        file<<charges[i];
+        file<<", ";
+        file<<slot[i];
+        file<<", ";
+        file<<channel[i];
+        file<<", ";
+        file<<event_id[i];
+        file<<std::endl;
+    
     }
 
     std::cout<<"counted "<<nhits<<" hits in "<<last_event_id<<" events"<<std::endl;

@@ -5,6 +5,7 @@ import os
 import json 
 from glob import glob 
 from cfd.do_cfd import do_cfd
+import matplotlib.pyplot as plt
 NS = 1.0 
 COUNTERS = 8*NS
 
@@ -34,13 +35,14 @@ def reader(filename):
     all_files = glob(filename)
     all_files = sorted(all_files)
     for fn in all_files:
-        print("Reading File {}".format(fn))
+        print("Reading File {}".format(fn)) 
         data = pd.read_parquet(fn)
         
         print("Extracting Waveforms")
         waveforms = []
         oldmask = []
-        for wave in data["samples"]:
+        for i, wave in enumerate(data["samples"]):
+
             if len(wave)==32:
                 waveforms.append(wave)
                 #plt.bar(range(32),wave, alpha=0.1, color='k') 
@@ -48,14 +50,15 @@ def reader(filename):
             else:
                 oldmask.append(False)
         waveforms=-1*np.array(waveforms)
-        times, amplitudes,baseline = do_cfd(waveforms)
+        times, amplitudes,baseline , good_mask= do_cfd(waveforms)
         fine_time += times.tolist()
         charge += amplitudes.tolist()
 
-        card += np.array(data["card_id"][oldmask]).tolist()
-        channel += np.array(data["chan"][oldmask]).tolist()
+        card += np.array(data["card_id"][oldmask][good_mask]).tolist()
+        channel += np.array(data["chan"][oldmask][good_mask]).tolist()
         #charge += np.array(data["charge"][:]).tolist()
-        coarse += np.array(data["coarse"][oldmask]).tolist()
+        coarse += np.array(data["coarse"][oldmask][good_mask]).tolist()
+        break
 
 
     card = np.array(card)
@@ -68,18 +71,18 @@ def reader(filename):
 
     card = card[mask]
     channel = channel[mask]
-    charge = np.array(charge)[mask]
     
-    fine_time = np.array(fine_time)[mask]
-    coarse = np.array(coarse)[mask]
+    
+    fine_time = np.array(fine_time).flatten()[mask]
+    coarse = np.array(coarse).flatten()[mask]
 
     slot_id, pmt_pos = get_info(card, channel)
+    charge = np.array(charge).flatten()[mask]
 
-    time =  (coarse +  fine_time)
-    time = time - np.min(time)
+    time =  (coarse + fine_time)
+    
     mask = np.logical_not(np.isnan(charge))
 
-    print(np.shape(time))
     
     all_data = np.array([
         time[mask], charge[mask], slot_id[mask], pmt_pos[mask]    

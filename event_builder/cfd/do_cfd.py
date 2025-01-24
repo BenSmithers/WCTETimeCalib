@@ -34,19 +34,19 @@ cfd_raw_t = np.array([0.16323452713658082,
 
 # correction for the amplitude derived by summing the largest three adcs
 amp_raw_t = np.array([2.0413475167493225, 2.0642014124776784, 2.0847238089021274, 2.1028869067818117, 2.118667914530039,
-                2.1320484585033723, 2.1430140317025583, 2.151553497195665, 2.1576586607668613, 2.1613239251470255,
-                2.162546035746829, 2.1613239251470255, 2.1576586607668617, 2.1515534971956654, 2.143014031702558,
-                2.1320484585033723, 2.118667914530039, 2.1028869067818117, 2.0847238089021274, 2.0642014124776784,
-                2.0413475167493225])
+                        2.1320484585033723, 2.1430140317025583, 2.151553497195665, 2.1576586607668613, 2.1613239251470255,
+                        2.162546035746829, 2.1613239251470255, 2.1576586607668617, 2.1515534971956654, 2.143014031702558,
+                        2.1320484585033723, 2.118667914530039, 2.1028869067818117, 2.0847238089021274, 2.0642014124776784,
+                        2.0413475167493225])
 
-cfd_true_t =np.array([-0.5 + 0.05*i for i in range(21)])
+cfd_true_t =np.linspace(-0.5, 0.5, 21)
 
 pathname = os.path.join(
     os.path.dirname(__file__),
     "..", "..",  
     "data",
     "laserball",
-    "laser_ball_comp_20241203112510_5_waveforms.parquet"
+    "laser_ball_20241203111520_0_waveforms.parquet"
 )
 
 def heights(waveforms):
@@ -68,14 +68,14 @@ def do_cfd(waveforms):
     apply_correction = True
 
     baseline = np.mean(waveforms[:,:nbins], axis=1)
+    latter_max = np.max(waveforms[:,8:], axis=1)
+    bad_sign = np.abs(latter_max)<4
 
     # baseline is number of waves 
     baseline = np.tile(baseline,nsample).reshape(nsample, len(baseline)).T
 
     print("sorting samples")
     sort_vals = np.sort(waveforms, axis=1)
-
-    
 
 
     amplitudes = sort_vals[:, -1] + sort_vals[:, -2] + sort_vals[:, -3]
@@ -97,17 +97,18 @@ def do_cfd(waveforms):
     for i in range(len(trimmed)):
         indx = np.argwhere(np.diff(np.sign(trimmed[i][offset:])))
         if len(indx)==0:
-            crossings.append(np.argwhere(np.diff(np.sign(trimmed[i])))[0] + 1 )
+            crossings.append(1)
+            #crossings.append(np.argwhere(np.diff(np.sign(trimmed[i])))[0] + 1 )
         else:
-            crossings.append(indx[0] + offset + 1)
+            crossings.append(int(indx[0] + offset + 1))
     
     crossings = np.array(crossings).flatten()
     
-    biggest_drop = np.argmax(diffs, axis=1)+1
+    #biggest_drop = np.argmax(diffs, axis=1)+1
 
-    times = np.zeros(len(biggest_drop))
-    times[np.isnan(biggest_drop)] = np.nan 
-    amplitudes[np.isnan(biggest_drop)] =np.nan
+    times = np.zeros(len(crossings))
+    #times[np.isnan(biggest_drop)] = np.nan 
+    #amplitudes[np.isnan(biggest_drop)] =np.nan
 
     # okay now apply the CFD 
     xmin = crossings-1
@@ -116,40 +117,50 @@ def do_cfd(waveforms):
     ymin = trimmed[np.arange(len(trimmed)), crossings-1]
     ymax =  trimmed[np.arange(len(trimmed)), crossings]
 
-    
-    x_interp = xmin -  (xmax-xmin) / (ymax-ymin) * ymin 
+    slope = (xmax-xmin) / (ymax-ymin) 
+
+    good_mask = slope>0
+    x_interp = xmin -  slope * ymin 
     
     delta = x_interp - (offset +1)
+
+    in_bounds = np.logical_and(cfd_raw_t[0] < delta, delta < cfd_raw_t[-1])
+
+    shift_up = delta +1 
+    shift_down = delta-1 
+
+    shift_up_good = np.logical_and( np.logical_not(in_bounds), np.logical_and(cfd_raw_t[0] < shift_up, shift_up < cfd_raw_t[-1]))
+    shift_down_good = np.logical_and( np.logical_not(in_bounds), np.logical_and(cfd_raw_t[0] < shift_down, shift_down < cfd_raw_t[-1]))
+    all_bad = np.logical_not(np.logical_or(in_bounds, np.logical_or(shift_up_good, shift_down_good)))
+
     
-
-
+    #apply_correction
     if apply_correction:
 
-        in_bounds = np.logical_and(cfd_raw_t[0] < delta, delta < cfd_raw_t[-1])
-
-        shift_up = delta +1 
-        shift_down = delta-1 
-
-        shift_up_good = np.logical_and( np.logical_not(in_bounds), np.logical_and(cfd_raw_t[0] < shift_up, shift_up < cfd_raw_t[-1]))
-        shift_down_good = np.logical_and( np.logical_not(in_bounds), np.logical_and(cfd_raw_t[0] < shift_down, shift_down < cfd_raw_t[-1]))
-        all_bad = np.logical_not(np.logical_or(in_bounds, np.logical_or(shift_up_good, shift_down_good)))
 
         times[in_bounds] = offset + np.interp(delta[in_bounds], cfd_raw_t, cfd_true_t)
-        times[shift_up_good] = offset - 1 + np.interp(shift_up[shift_up_good], cfd_raw_t, cfd_true_t)
-        times[shift_down_good] = offset +1 + np.interp(shift_down[shift_down_good], cfd_raw_t, cfd_true_t)
+        times[shift_up_good] = offset + 1 + np.interp(shift_up[shift_up_good], cfd_raw_t, cfd_true_t)
+        times[shift_down_good] = offset -1 + np.interp(shift_down[shift_down_good], cfd_raw_t, cfd_true_t)
+    else:
+        times = offset  + delta
 
-        times[all_bad] = x_interp[all_bad] - TIME_MAGIC
-        amplitudes[all_bad] = amplitudes[all_bad]/AMP_MAGIC
+    times[all_bad] = x_interp[all_bad] - TIME_MAGIC
+    amplitudes[all_bad] = amplitudes[all_bad]/AMP_MAGIC
 
-        amplitudes[np.logical_not(all_bad)] /= np.interp(times[np.logical_not(all_bad)], cfd_true_t, amp_raw_t )
+    amplitudes[np.logical_not(all_bad)] /= np.interp(times[np.logical_not(all_bad)], cfd_true_t, amp_raw_t )
 
     times -= offset
 
-    if True:
+    good_mask = np.logical_and(good_mask, np.abs(times)<0.6)
+    #good_mask = np.logical_and(good_mask, np.logical_not(in_bounds))
+    #good_mask = np.logical_and(good_mask, np.logical_not(bad_sign))
+
+    if False:
         i = 0
         plotted = 0
         while True:
-            if times[i]<0.3395 and times[i]>0.3373:
+            if times[i]>0.33902 and times[i]<0.33978:
+                good_mask[i] = False
                 #print(x_interp[i], delta[i])
                 plt.clf()
                 
@@ -157,39 +168,42 @@ def do_cfd(waveforms):
                 #plt.plot(crossings[i]+delay, trimmed[i][crossings[i]], 'rd', label="Crossings")
 
                 plt.plot(range(len(waveforms[i])), waveforms[i], label="waveform")
-                plt.plot(np.array(range(len(trimmed[i]))) + delay, trimmed[i], label="Convolved")
+                #plt.plot(np.array(range(len(trimmed[i]))) + delay, trimmed[i], label="Convolved")
 
-                plt.plot([xmin[i]+delay, xmax[i]+delay], [ymin[i], ymax[i]], label="Crossing", color="green")
+                #plt.plot([xmin[i]+delay, xmax[i]+delay], [ymin[i], ymax[i]], label="Crossing", color="green")
                 plt.grid(which='major', alpha=0.5)
                 plt.legend()
                 plt.show()
-                plotted+=1 
+                plotted+=1
             i+=1 
             
             if plotted>10:
                 break
 
 
-    return times, amplitudes, baseline
+    return times[good_mask], amplitudes[good_mask], baseline[good_mask], good_mask
 
 
 if __name__=="__main__":
 
     print("Reading file")
-    data = pd.read_parquet(pathname)["samples"]
-
+    data = pd.read_parquet(pathname)
+    cards = np.array(data["card_id"])
+    data = data["samples"]
     print("Extracting Waveforms")
     waveforms = []
-    for wave in data:
-        if len(wave)==32:
+    for iw, wave in enumerate(data[:100]):
+        if len(wave)==32 and cards[iw]==131:
             waveforms.append(wave)
             #plt.stairs(wave,range(33), alpha=0.1, color='k')
     waveforms= -1*np.array(waveforms)
 
 
     #heights(waveforms)
-    times, amplitudes,baseline = do_cfd(waveforms)
+    times, amplitudes,baseline, filter = do_cfd(waveforms)
 
-    plt.hist(times, bins=np.linspace(-1, 1, 1000))
+    n_bad = np.sum(np.logical_or(times>1, times<-1).astype(int))
+    print(n_bad)
+    plt.hist(times, bins=np.linspace(-0.6, 0.6, 2000))
     plt.show()
 
