@@ -5,10 +5,11 @@ import os
 import pandas as pd 
 from math import inf 
 import matplotlib.pyplot as plt 
-
+import json
 
 TIME_MAGIC = 0.5703
 AMP_MAGIC = 2.118 
+DEBUG = False
 
 cfd_raw_t = np.array([0.16323452713658082,
                 0.20385733509493395,
@@ -49,6 +50,20 @@ pathname = os.path.join(
     "laser_ball_20241203111520_0_waveforms.parquet"
 )
 
+with open(os.path.join(os.path.dirname(__file__), "..","..","WCTECalib","geodata",'PMT_Mapping.json'), 'r') as file:
+    pmt_data = json.load(file)["mapping"]
+
+def get_info(card_id, channel):
+    """
+        returns slot_id, pmt_pos
+    """
+
+    # parse them! 
+
+    keys = (100*card_id)+channel 
+    long_form_id = np.array([pmt_data[str(key)] for key in keys])
+
+    return long_form_id//100, long_form_id%100 
 def heights(waveforms):
     diffs = np.max(waveforms,axis=1) - np.min(waveforms,axis=1)
     diffs = np.abs(diffs)
@@ -58,7 +73,7 @@ def heights(waveforms):
     plt.show()
 
 def do_cfd(waveforms):
-    print("Running CFD")
+    #print("Running CFD")
     assert len(waveforms[0])==32, "Double-check the format of the waveforms file"
     
     nbins = 4
@@ -68,13 +83,11 @@ def do_cfd(waveforms):
     apply_correction = True
 
     baseline = np.mean(waveforms[:,:nbins], axis=1)
-    latter_max = np.max(waveforms[:,8:], axis=1)
-    bad_sign = np.abs(latter_max)<4
 
     # baseline is number of waves 
     baseline = np.tile(baseline,nsample).reshape(nsample, len(baseline)).T
 
-    print("sorting samples")
+    # SLOW
     sort_vals = np.sort(waveforms, axis=1)
 
 
@@ -85,15 +98,10 @@ def do_cfd(waveforms):
     trimmed =(waveforms[:, delay:] -baseline[:, delay:] ) + multiplier*(waveforms[:, :-delay] - baseline[:, delay:])
     trimmed = trimmed.astype(float)
 
-    
-
     # now, find the index with the largest step that goes from + to -
-    diffs = trimmed[:,1:] - trimmed[:, :-1]
-    not_swing = np.logical_or(diffs <= trimmed[:, :-1], trimmed[:, :-1]>0)
-    #diffs[not_swing] = -1
     offset = 5
-    #crossings = np.array([np.argwhere(np.diff(np.sign(trimmed[i][offset:])))[0] for i in range(len(trimmed))]) + offset +1
     crossings = []
+    # SLOW 
     for i in range(len(trimmed)):
         indx = np.argwhere(np.diff(np.sign(trimmed[i][offset:])))
         if len(indx)==0:
@@ -104,11 +112,8 @@ def do_cfd(waveforms):
     
     crossings = np.array(crossings).flatten()
     
-    #biggest_drop = np.argmax(diffs, axis=1)+1
 
     times = np.zeros(len(crossings))
-    #times[np.isnan(biggest_drop)] = np.nan 
-    #amplitudes[np.isnan(biggest_drop)] =np.nan
 
     # okay now apply the CFD 
     xmin = crossings-1
@@ -155,11 +160,11 @@ def do_cfd(waveforms):
     #good_mask = np.logical_and(good_mask, np.logical_not(in_bounds))
     #good_mask = np.logical_and(good_mask, np.logical_not(bad_sign))
 
-    if False:
+    if DEBUG:
         i = 0
         plotted = 0
         while True:
-            if times[i]>0.33902 and times[i]<0.33978:
+            if True: 
                 good_mask[i] = False
                 #print(x_interp[i], delta[i])
                 plt.clf()
@@ -167,12 +172,15 @@ def do_cfd(waveforms):
                 #trim_cros =np.argwhere(np.diff(np.sign(trimmed[i])))
                 #plt.plot(crossings[i]+delay, trimmed[i][crossings[i]], 'rd', label="Crossings")
 
-                plt.plot(range(len(waveforms[i])), waveforms[i], label="waveform")
-                #plt.plot(np.array(range(len(trimmed[i]))) + delay, trimmed[i], label="Convolved")
+                plt.plot(range(len(waveforms[i])), waveforms[i], label="Waveform")
+                plt.plot(np.array(range(len(trimmed[i]))) + delay, trimmed[i], label="Processed")
 
-                #plt.plot([xmin[i]+delay, xmax[i]+delay], [ymin[i], ymax[i]], label="Crossing", color="green")
+                plt.plot([xmin[i]+delay, xmax[i]+delay], [ymin[i], ymax[i]], label="Crossing", color="green")
                 plt.grid(which='major', alpha=0.5)
+                plt.xlabel("Coarse Counter", size=14)
+                plt.ylabel("ADC", size=14)
                 plt.legend()
+                plt.tight_layout()
                 plt.show()
                 plotted+=1
             i+=1 
@@ -187,13 +195,26 @@ def do_cfd(waveforms):
 if __name__=="__main__":
 
     print("Reading file")
-    data = pd.read_parquet(pathname)
+    import sys 
+    data = pd.read_parquet(sys.argv[1])
     cards = np.array(data["card_id"])
-    data = data["samples"]
+    chan = np.array(data["chan"])
+    
+    keys = (100*cards)+chan 
+    mask = np.array([str(key) in pmt_data for key in keys])
+
+    card = cards[mask]
+    channel = chan[mask]
+
+    slot_id, pmt_pos = get_info(card, channel)
+
+    do = np.logical_and(slot_id==0, pmt_pos==0)
+    data = data["samples"][mask]
+
     print("Extracting Waveforms")
     waveforms = []
-    for iw, wave in enumerate(data[:100]):
-        if len(wave)==32 and cards[iw]==131:
+    for iw, wave in enumerate(data[:1000]):
+        if len(wave)==32:
             waveforms.append(wave)
             #plt.stairs(wave,range(33), alpha=0.1, color='k')
     waveforms= -1*np.array(waveforms)
