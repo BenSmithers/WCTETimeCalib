@@ -13,7 +13,7 @@ from random import choice
 import h5py as h5 
 from math import nan
 DEBUG =True
-force_calc = False 
+force_calc = True 
 
 central_ball_loc = ball_pos
 
@@ -29,15 +29,15 @@ binned_data_file = os.path.join(
     ".processed_data.csv"
 )
 
-offsets = np.linspace(-180*5, 180*5, 720*5)
+offsets = np.linspace(-180*7, 180*7, 720*10)
 offset_center = 0.5*(offsets[1:] + offsets[:-1])
-binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1)+1 
+binids = np.arange(-0.5, N_CHAN*N_MPMT+0.5, 1) 
 
-just_id_bins = np.zeros(N_CHAN*N_MPMT)
+just_id_bins = np.zeros(N_CHAN*N_MPMT+1)
 if os.path.exists(binned_data_file) and not force_calc:
     print("LOADING PRE-SAVED BINNED DATA")
     all_bins = np.loadtxt(binned_data_file) 
-    reference_id =133
+    reference_id = 112
 else:
 
     all_bins = np.zeros(( len(binids)-1, len(offsets)-1))
@@ -47,37 +47,43 @@ else:
 
     # this way we do the I/O all at once; this is significantly faster 
 
-    reference_id = -1 
+    reference_id = 112
     n_flash = len(data.keys())
 
     print("... {} Events".format(n_flash))
     print("... Collecting hits")
     print("Reference PMT - {}".format(reference_id))
-
-    for _flash_id in tqdm(range(n_flash)):
-        flash_id = _flash_id+1
-        for id in np.array(data["event{}/pmt_id".format(flash_id)]):
-            just_id_bins[int(id)] +=1
-            
-    reference_id = np.argmax(just_id_bins)+1
+    if False:
+        for _flash_id in tqdm(range(n_flash)):
+            flash_id = _flash_id+1
+            for id in np.array(data["event{}/pmt_id".format(flash_id)]):
+                just_id_bins[int(id)] +=1
+                
+        reference_id = np.argmax(just_id_bins)
     print("Set reference ID to {}".format(reference_id))
-    for _flash_id  in tqdm(range(n_flash)):
+
+
+    for _flash_id  in tqdm(range(2000)):
+        if _flash_id==0:
+            print("Skipping fake event")
+            continue
         flash_id = _flash_id+1
+
+
 
         
 
         # ids in the data files are off by 1 relative to the geo file
-        _ids = np.array(data["event{}/pmt_id".format(flash_id)]) + 1
-        if reference_id==-1:
-            reference_id = mode(_ids)[0]
-            print("Set reference ID to {}".format(reference_id))
+        if not "event{}/pmt_id".format(flash_id) in data:
+            continue
+        _ids = np.array(data["event{}/pmt_id".format(flash_id)]) 
         if reference_id not in _ids:
             continue
         _t_meas= np.array(data["event{}/time".format(flash_id)])
         _charge = np.array(data["event{}/charge".format(flash_id)])
 
         these_data = np.array([_ids, _t_meas, _charge]).T 
-        these_data = np.array(sorted(these_data, key=lambda x:x[1] ))
+        these_data = np.array(sorted(these_data, key=lambda x:x[1] , reverse=True))
 
         ids = []
         charges = []
@@ -87,17 +93,18 @@ else:
                 ids.append(entry[0])
                 charges.append(entry[2])
                 t_meas.append(entry[1])
-        t_meas = np.array(t_meas)
+
+        
         ids = np.array(ids)
         bin_where = np.argwhere(ids==reference_id)[0]
+        t_meas = np.array(t_meas) - np.array(_t_meas[bin_where])
 
-        _t_meas = _t_meas - t_meas[bin_where] 
 
         #charge = []
 
         # we need to filter this so only the earliest time entry is kept
 
-        all_bins += np.histogram2d(_ids, _t_meas, bins=(binids, offsets))[0]
+        all_bins += np.histogram2d(ids, t_meas, bins=(binids, offsets))[0]
 
 
 
@@ -107,6 +114,7 @@ if DEBUG:
     import matplotlib.pyplot as plt
     from WCTECalib.utils import get_color 
 peaks = []
+heights = []
 peak_width = []
 metrics = []
 print("... fitting hits")
@@ -121,7 +129,8 @@ is_good = []
 
 for id in tqdm(range(len(all_bins))):
     this_wave = all_bins[id] #np.sum(all_bins[id])
-    renorm = 1/np.sum(all_bins[id])
+    renorm = 1.0
+    #renorm = 1/np.sum(all_bins[id])
     if np.sum(this_wave)==0:
         peaks.append(np.nan)
         peak_width.append(np.nan)
@@ -156,11 +165,11 @@ for id in tqdm(range(len(all_bins))):
     stepsize = offsets[1]-offsets[0]
     distance = 7./stepsize
 
-    tpeak = find_peaks(this_wave, 0.4*np.nanmax(this_wave), distance=distance)[0]
+    tpeak = find_peaks(this_wave, 0.6*np.nanmax(this_wave), distance=distance)[0]
 
-    if len(tpeak)!=1:
+    if len(tpeak)!=1:#  or np.log10(goodness)<1.5:
         print("Two peaks")
-        shiftval = nan
+        shiftval = np.nan
         n_bad +=1 
         is_good.append(0)
         peaks.append(np.nan)
@@ -170,20 +179,21 @@ for id in tqdm(range(len(all_bins))):
     else:
         n_good +=1 
         is_good.append(1)
-        shiftval = offset_center[tpeak[0]] # cfd_time
+        shiftval = cfd_time # offset_center[tpeak[0]] # cfd_time
     
-    if  nplot<maxplot and goodness>5e5 and (not np.isnan(shiftval)):
+    if  nplot<maxplot and (np.log10(goodness)>1.5) and (not np.isnan(shiftval)):
         print(shiftval)
-        plt.stairs(this_wave*renorm + nplot*0.025, offsets-shiftval*0.90, color=get_color(nplot/maxplot, 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
-        plt.stairs(this_wave*renorm + nplot*0.025+0.001, offsets+0.5 - shiftval*0.90, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
+        plt.stairs(this_wave*renorm + nplot*0.025, offsets-shiftval*0.59, color=get_color(nplot/maxplot, 1, "inferno"), alpha=1., zorder=100-nplot, fill=True)
+        plt.stairs(this_wave*renorm + nplot*0.025+0.001, offsets+0.5 - shiftval*0.59, color='k', alpha=0.3, zorder=100-nplot-0.5, fill=True)
         
 
         xfine = np.linspace(min(offset_center), max(offset_center), 3000)
-        yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(10**res.x[2]))**2)
-        #plt.plot(xfine-shiftval*0.90, yfine*renorm+ nplot*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-nplot+0.25)
+        yfine = res.x[0]*np.exp(-0.5*((xfine - res.x[1])/(res.x[2]))**2)
+        plt.plot(xfine-shiftval*0.59, yfine*renorm+ nplot*0.025, 'cyan', alpha=0.5, ls='--', zorder=100-nplot+0.25)
         nplot+=1
     peaks.append(shiftval)
-    peak_width.append(10**res.x[2])
+    peak_width.append(res.x[2])
+    heights.append(res.x[0])
 
 print("{} good, {} bad, {} gone".format(n_good, n_bad, not_there))
 
@@ -195,26 +205,41 @@ plt.savefig(os.path.join(os.path.dirname(__file__), "..","plotting","plots","raw
 plt.show()
 plt.clf()
 
-bins =np.linspace( np.nanmin(metrics), np.nanmax(metrics), 100)
-binned_met = np.histogram(metrics, bins)
+bins =np.linspace( -1, 6, 1000)
+binned_met = np.histogram(np.log10(metrics), bins)
 plt.stairs(binned_met[0], bins)
 plt.xlabel("Fit Metric", size=14)
 plt.ylabel("Counts",size=14)   
 plt.show()
 
 
-ids = (0.5*(binids[1:] + binids[:-1])).astype(int) -1
+ids = (0.5*(binids[1:] + binids[:-1])).astype(int)
     
 
 
 
-mask = np.array([id in np.array(df["unique_id"][:]) for id in ids])
-positions = get_pmt_positions(ids)
 
+positions = []
+mask = []
+for uid in ids:
+    pos = get_pmt_positions([uid,])
+    if uid in [1899, 1885, 1896, 1898]:
+        print("Found it...")
+        print(uid)
+        print(pos)
+
+    if len(pos)!=0:
+        positions.append(pos[0])
+        mask.append(True)
+    else:
+        mask.append(False)
+mask = np.array(mask).flatten()
+print(np.shape(positions))
+positions = np.array(positions)
 is_good = np.array(is_good)[mask]
 
+
 ax = plt.axes(projection="3d")
-print(len(is_good))
 scatty = ax.scatter(positions.T[0], positions.T[1], positions.T[2], c=is_good.astype(int),vmin=0, vmax=1, cmap=plt.cm.inferno)
 #ax.plot(xs, ys, zs, 'bo')
 ax.set_xlabel("X [m]")
@@ -222,6 +247,8 @@ ax.set_ylabel("Y [m]")
 ax.set_zlabel("Z [m]")
 set_axes_equal(ax)
 plt.show()
+
+
 
 
 distances = np.sqrt(np.sum( (positions - central_ball_loc)**2 , axis=1)) #predicted distances
@@ -232,8 +259,11 @@ new_df = deepcopy(df)
 new_df["calc_offset"] = use_offsets  
 new_df["offset_sigma"] = np.array(peak_width)[mask]
 
-new_df.to_csv(
-    os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_realdata.csv"),
-    index=False
-)
+#new_df["nhits"] = np.array(heights)[mask]
+
+if True:
+    new_df.to_csv(
+        os.path.join(os.path.dirname(__file__),"..", "data","calculated_offsets_realdata.csv"),
+        index=False
+    )
 #np.array(df["unique_id"]), mean_offsets

@@ -4,26 +4,14 @@ import sys
 import os 
 import json 
 from glob import glob 
-from cfd.do_cfd import do_cfd
+from cfd.do_cfd import do_cfd, get_info, pmt_data
 import matplotlib.pyplot as plt
 NS = 1.0 
 COUNTERS = 8*NS
+PERIOD = 262144
 
 # Open and read the JSON file
-with open(os.path.join(os.path.dirname(__file__), "..","WCTECalib","geodata",'PMT_Mapping.json'), 'r') as file:
-    pmt_data = json.load(file)["mapping"]
 
-def get_info(card_id, channel):
-    """
-        returns slot_id, pmt_pos
-    """
-
-    # parse them! 
-
-    keys = (100*card_id)+channel 
-    long_form_id = np.array([pmt_data[str(key)] for key in keys])
-
-    return long_form_id//100, long_form_id%100 
 
 def reader(filename):
     card = []
@@ -34,67 +22,69 @@ def reader(filename):
 
     all_files = glob(filename)
     all_files = sorted(all_files)
+    
     for fn in all_files:
         print("Reading File {}".format(fn)) 
         data = pd.read_parquet(fn)
+        these_cards = np.array(data["card_id"])
+        these_chans = np.array(data["chan"])
+        these_coarse = np.array(data["coarse"])
+        keys = (100*these_cards)+these_chans
+        mask = np.array([str(key) in pmt_data for key in keys])
+
+        all_waves = data["samples"][mask]
+        trimed_waves = []
+        these_cards = these_cards[mask]
+        these_chans = these_chans[mask]
+        these_coarse = these_coarse[mask]
         
         print("Extracting Waveforms")
-        waveforms = []
-        oldmask = []
-        for i, wave in enumerate(data["samples"]):
-
+        sample_mask = []
+        for i, wave in enumerate(all_waves):
+            if these_cards[i]==131:
+                print("That's a trigger thing")
             if len(wave)==32:
-                waveforms.append(wave)
+                trimed_waves.append(wave)
                 #plt.bar(range(32),wave, alpha=0.1, color='k') 
-                oldmask.append(True)
+                sample_mask.append(True)
             else:
-                oldmask.append(False)
-        waveforms=-1*np.array(waveforms)
-        times, amplitudes,baseline , good_mask= do_cfd(waveforms)
-        fine_time += times.tolist()
+                sample_mask.append(False)
+        
+        
+        trimed_waves=-1*np.array(trimed_waves)
+        times, amplitudes,baseline, add_filter = do_cfd(trimed_waves)
+
+        card += these_cards[sample_mask][add_filter].tolist()
+        channel += these_chans[sample_mask][add_filter].tolist()
         charge += amplitudes.tolist()
+        fine_time += times.tolist()
+        coarse+= these_coarse[sample_mask][add_filter].tolist()
 
-        card += np.array(data["card_id"][oldmask][good_mask]).tolist()
-        channel += np.array(data["chan"][oldmask][good_mask]).tolist()
-        #charge += np.array(data["charge"][:]).tolist()
-        coarse += np.array(data["coarse"][oldmask][good_mask]).tolist()
-        break
-
-
-    card = np.array(card)
-    channel= np.array(channel)
-
-
-    keys = (100*card)+channel 
-
-    mask = np.array([str(key) in pmt_data for key in keys])
-
-    card = card[mask]
-    channel = channel[mask]
-    
-    
-    fine_time = np.array(fine_time).flatten()[mask]
-    coarse = np.array(coarse).flatten()[mask]
+    channel= np.array(channel).flatten()
+    card = np.array(card).flatten()
+    charge = np.array(charge).flatten()
+    fine_time = np.array(fine_time).flatten()
+    coarse = np.array(coarse).flatten()
+    time =  ((coarse + fine_time)*COUNTERS) #  % PERIOD
 
     slot_id, pmt_pos = get_info(card, channel)
-    charge = np.array(charge).flatten()[mask]
 
-    time =  (coarse + fine_time)
-    
-    mask = np.logical_not(np.isnan(charge))
+    add_mask = np.array([sid not in [57, 58, 81] for sid in slot_id]).flatten()
+    print("Cutting {} hits".format(np.sum(1-add_mask.astype(int))))
 
-    
+
+    time = time - np.min(time)
     all_data = np.array([
-        time[mask], charge[mask], slot_id[mask], pmt_pos[mask]    
+        time[add_mask], charge[add_mask], slot_id[add_mask], pmt_pos[add_mask]
     ]).T 
 
-    all_data = sorted(all_data, key=lambda x:x[0], reverse=False)
+    all_data = sorted(all_data, key=lambda x:x[0], reverse=False) # we specifically list these in reverse time order! 
 
     print("Saving file")
     np.savetxt("hits.csv", all_data, delimiter=", ")
-
+    return all_data
 
 
 if __name__=="__main__":
     print(sys.argv[1])
-    data = reader(sys.argv[1])
+    all_data = reader(sys.argv[1])
