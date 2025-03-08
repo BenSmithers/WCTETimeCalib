@@ -14,6 +14,11 @@ NS = 1.0
 COUNTERS = 8*NS
 MAXNO = 1e6
 
+offsets = pd.read_csv(os.path.join(os.path.dirname(__file__), "..","data","calculated_offsets_realdata.csv"))
+offset_id = offsets["unique_id"]
+offset_time = offsets["calc_offset"]
+
+
 outfile = os.path.join(
     os.path.dirname(__file__),
     "..",
@@ -26,8 +31,8 @@ def process_events(times, ids):
     """
         Assuming reverse order for now
     """
-    THRESH = 100
-    T_WIDTH = 500
+    THRESH = 75
+    T_WIDTH = 10
     ENO = 1
     assert times[3]<times[2], "Wrong time order"
     assert len(times)==len(ids), "Irregular number of things!"
@@ -48,8 +53,8 @@ def process_events(times, ids):
     
     n_incl = max_index - index + 1
     if n_incl>THRESH: # enough to trigger an event, so assign these to the next event 
-        print("Triggered with {} hits".format(n_incl))    
-        new_max = times[max_index]+500 # an extra, eh 500 ns? 
+        #print("Triggered with {} hits".format(n_incl))    
+        new_max = times[max_index]+5 # an extra, 10 ns? 
         shift_max = max_index 
         call_once = False 
         while times[shift_max]<new_max and shift_max<len(times)-1:
@@ -77,7 +82,7 @@ def process_events(times, ids):
 
         if n_incl>THRESH: # enough to trigger an event, so assign these to the next event 
             print("Triggered with {} hits".format(n_incl))    
-            new_min = times[max_index]-500 # an extra, eh 500 ns? 
+            new_min = times[max_index]-10 # an extra, eh 500 ns? 
             shift_max = max_index 
             call_once = False 
             while times[shift_max]>new_min and shift_max<len(times)-1:
@@ -155,15 +160,23 @@ def reader(filename):
     card = np.array(card).flatten()
     
     fine_time = np.array(fine_time).flatten()
+    
+    
+
     coarse = np.array(coarse).flatten()
     
     charge = np.array(charge).flatten()
     time =  ((coarse + fine_time)*COUNTERS) #  % PERIOD
     slot_id, pmt_pos = get_info(card, channel)
     
-    add_mask = np.array([sid not in [57, 58, 81] for sid in slot_id]).flatten()
+    #all_shifties =np.array([ offset_time[ offset_id == (slot_id*19+pmt_pos)[i] ] for i in range(len(fine_time))])
+
+    metadf = pd.DataFrame({"ID": (19*slot_id+pmt_pos).astype(int)})
+    reference = pd.DataFrame({"ID":offset_id.astype(int), "time":offset_time})
+    all_shifties = np.array(pd.merge(metadf, reference, on="ID", how="left")["time"], dtype=float)    
+    add_mask = np.logical_and(np.array([sid not in [57, 58, 81] for sid in slot_id]).flatten(), np.logical_not(np.isnan(all_shifties)))
     all_data = np.array([
-        time[add_mask], charge[add_mask], slot_id[add_mask], pmt_pos[add_mask]
+        time[add_mask]-all_shifties[add_mask], charge[add_mask], slot_id[add_mask], pmt_pos[add_mask]
     ]).T
 
     all_data = sorted(all_data, key=lambda x:x[0], reverse=True)

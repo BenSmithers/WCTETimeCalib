@@ -16,7 +16,7 @@ ABS_LEN = 20# meters
 
 
 N_WATER = 1.33 
-ball_pos = np.array([0,1.6-2.86, 0])
+ball_pos = np.array([0,0, 0])
 
 def convert_to_2d_offset(offset_dict, as_dict=True ):
     """

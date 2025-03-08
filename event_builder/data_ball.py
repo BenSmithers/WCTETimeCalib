@@ -6,19 +6,21 @@ import pandas as pd
 from cfd.do_cfd import do_cfd, pmt_data, get_info
 import matplotlib.pyplot as plt 
 from scipy.stats import mode 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, basinhopping
 from WCTECalib import df, get_pmt_positions
 from WCTECalib.utils import ball_pos, second, C, N_WATER
 import os 
 from copy import deepcopy 
 from tqdm import tqdm
+from scipy.signal import find_peaks
 
 #filename = "../data/laserball/laser_ball_20241203111520_0_waveforms.parquet"
-#filename = "../data/ukli/ukli_diffuser__20241205175133_0_waveforms.parquet"
-# ilename = "../data/laserball/laser_ball_20241205181433_0_waveforms.parquet"
+#filename = "../data/ukli/ukli_diffuser__20241205175133_1_waveforms.parquet"
+#filename = "../data/laserball/laser_ball_20241205181433_0_waveforms.parquet"
 filename = "../data/laserball/laser_ball_20241205183135_6_waveforms.parquet"
-DEBUG = True
+DEBUG = False
 PERIOD = 262144
+#PERIOD = 262140.2
 dfile = pd.read_parquet(filename)
 
 # okay, so what we're doing is going through and grabbing all of the hits on all of the PMTS
@@ -28,6 +30,7 @@ print(mPMT_card)
 
 REFRENCE_TIME = -1
 def do_fit(raw_times, raw_wave, x0, double_fit= False):
+
     def metric(params):
         mu = params[1]
         sigma =params[2]
@@ -45,6 +48,7 @@ def do_fit(raw_times, raw_wave, x0, double_fit= False):
         presum = (raw_wave - params[0]*np.exp(-0.5*((raw_times - mu)/sigma)**2) - amp2*np.exp(-0.5*((raw_times -mu -8)/sigma)**2) )**2
         return np.nansum(presum)
     
+    
     bounds = [
             (0, np.inf),
             (min(raw_times), max(raw_times)),
@@ -61,6 +65,11 @@ new_df = deepcopy(df)
 new_df["calc_offset"] = np.nan*np.ones_like(new_df["unique_id"])
 new_df["nhits"] = np.nan*np.ones_like(new_df["unique_id"])
 new_df["offset_sigma"] = np.nan*np.ones_like(new_df["unique_id"])
+
+time_bins = np.linspace(dfile["coarse"].min(), dfile["coarse"].max(), 500)
+tcenter = 0.5*(time_bins[:-1] + time_bins[1:])
+twide = time_bins[1:] - time_bins[:-1] 
+
 ref_time = -1 
 for card_id in tqdm(mPMT_card):
     one_good = False
@@ -109,18 +118,26 @@ for card_id in tqdm(mPMT_card):
             _coarse_time = _coarse_cut*8 % PERIOD
             REFRENCE_TIME = mode(_coarse_time).mode
             print("Setting Reference time to {}".format(REFRENCE_TIME))
-            #fig2, ax2= plt.subplots()
-            #ax2.hist(_coarse_time, bins=np.linspace(REFRENCE_TIME-10000, REFRENCE_TIME+10000, 2000))
-            #plt.show()
-            
+
             
 
         coarse_cut =np.array( these_coarse[keep_mask][cfd_filter]) - REFRENCE_TIME
-                
+        
+        binned = np.histogram(fine_time + these_coarse[keep_mask][cfd_filter], time_bins)[0]
+        fract_lt = np.sum((binned>(0.25*np.max(binned))).astype(float))
+        fract_lt /= (len(time_bins)-1)
+
         coarse_time = coarse_cut*8 % PERIOD
 
         mode_time = mode(coarse_time).mode
         shift_time = (( coarse_cut+ fine_time)*8) % PERIOD
+
+        if  False: # card_id==6 and channel==0:
+            fig2, ax2= plt.subplots()
+            ax2.hist(shift_time, bins=np.linspace(0, PERIOD, 600))
+            #ax2.set_xlabel()
+            plt.show()
+        
 
         # okay we have our time distributions now 
         
@@ -130,28 +147,23 @@ for card_id in tqdm(mPMT_card):
         bins = np.linspace(mode_time - 20, mode_time+20, 60)
         bcenter = 0.5*(bins[1:] + bins[:-1])
         binned = np.histogram(shift_time, bins)[0]
-        result, metric = do_fit(bcenter, binned, [np.max(binned),mode_time, 1.5])
-        new_one = [result[0], result[1], result[2], 0.25]
-        double1, metric1 = do_fit(bcenter, binned, new_one, True)
-        new_one = [result[0], result[1]-8, result[2], 0.25]
-        double2,metric2 = do_fit(bcenter, binned, new_one, True)
+        result, metric = do_fit(bcenter, binned, [np.max(binned),bcenter[np.argmax(binned)], 1.5])
 
-
-        if metric1<metric2:
-            double = double1
-        else:
-            double = double2
+        peaks = find_peaks(binned, height=0.1*np.max(binned))
+        double = len(peaks[0])>1
 
         fine_x = np.linspace( mode_time - 20, mode_time +20, 2000)
-        is_double = double[-1]/double[0]>0.10
+        is_double = False 
         if is_double:
+            color='red'
             fine_y = double[0]*np.exp(-0.5*((fine_x - double[1])/double[2])**2) + double[3]*np.exp(-0.5*((fine_x - double[1]-8)/double[2])**2)
         else :
+            color='green'
             fine_y = result[0]*np.exp(-0.5*((fine_x - result[1])/result[2])**2)
 
 
-        if DEBUG and True:
-            axes[irow][i_column].plot(fine_x, fine_y, label="Fit")
+        if not DEBUG:
+            axes[irow][i_column].plot(fine_x, fine_y, label="Fit", color=color)
             axes[irow][i_column].stairs(binned ,bins, label="Data")
             axes[irow][i_column].set_ylim([0, 500])
             #axes[irow][i_column].vlines([result[1], result[1]+8 ],0, max(fine_y), color='red')
@@ -166,18 +178,18 @@ for card_id in tqdm(mPMT_card):
             plt.show()
 
         if result[0]>10 and (not is_double):
-            if int(slot_id)==75 and int(pmt_pos) ==0:
+            if int(slot_id)==49 and int(pmt_pos) ==0:
                 ref_time = result[1]
-
             who = np.logical_and(new_df["mPMT_slot_id"] == slot_id, new_df["Chan"]==pmt_pos)
             new_df.loc[who, "calc_offset"] = result[1]
             new_df.loc[who, "offset_sigma"] =result[2]
-            new_df.loc[who, "nhits"] = result[0]
+            new_df.loc[who, "nhits"] = result[0]/fract_lt
             one_good = True
         else:
             continue
     if one_good:
-        plt.savefig("./plots/card{}.png".format(card_id))
+
+        plt.savefig("./plots/card{}.png".format(card_id), dpi=400)
 
 
 positions= get_pmt_positions(new_df["unique_id"])
