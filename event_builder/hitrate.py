@@ -13,7 +13,7 @@ def bin_data(filename, time_bins=None):
     dfile = pd.read_parquet(filename) 
     if time_bins is None:
         #time_bins = np.linspace(dfile["coarse"].max()*0.05, dfile["coarse"].max()*0.90, 50)
-        time_bins = np.linspace(dfile["coarse"].min(), dfile["coarse"].max(), 100)
+        time_bins = np.linspace(dfile["coarse"].min(), dfile["coarse"].max()/5, 50)
     card_id = dfile["card_id"][0]
 
     rawtime =dfile["coarse"]
@@ -50,7 +50,7 @@ def old_mode(filename, ):
 
     rawtime =dfile["coarse"]
 
-    time_bins = np.linspace(dfile["coarse"].min(), dfile["coarse"].max(), 100)
+    time_bins = np.linspace(dfile["coarse"].min(), dfile["coarse"].max(), 1000)
     tcenter = 0.5*(time_bins[:-1] + time_bins[1:])
     twide = time_bins[1:] - time_bins[:-1] 
     #print("Working..",end='')
@@ -115,12 +115,10 @@ def old_mode(filename, ):
 if __name__=="__main__":
     import sys  
     folder = sys.argv[1]
-    old_mode(folder)
-    sys.exit()
 
     print("Processing {}".format(folder))
     reference_time = -1 
-    all_files = glob(folder + "/*waveforms.parquet")
+    all_files = glob(folder + "/*_waveforms.parquet")
 
     time_bins = None 
     for file in tqdm(all_files):
@@ -138,4 +136,5 @@ if __name__=="__main__":
         plt.xlabel("Time [minutes]",size=14)
         plt.ylabel("Hits", size=14)
         plt.tight_layout()
+        plt.savefig("./plots/rate_card{}.png".format(card_id), dpi=400)
         plt.show()

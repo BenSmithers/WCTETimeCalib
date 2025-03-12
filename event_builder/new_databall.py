@@ -78,6 +78,7 @@ def process(filename, reference_time = -1, docfd=False):
             slot_id, pmt_pos = get_info(np.array([card_id,]), np.array([channel,]))
             slot_id = slot_id[0]
             pmt_pos = pmt_pos[0]
+            
 
         unique_id = slot_id*19 + pmt_pos
 
@@ -148,7 +149,7 @@ def process(filename, reference_time = -1, docfd=False):
         bcenter = 0.5*(bins[1:] + bins[:-1])
         binned = np.histogram(shift_time, bins)[0]
 
-        peaks = find_peaks(binned, height=0.05*np.max(binned))
+
         
 
         result, metric = do_fit(bcenter, binned, [np.max(binned),bcenter[np.argmax(binned)], 1.5])
@@ -158,8 +159,17 @@ def process(filename, reference_time = -1, docfd=False):
         
 
         fine_y = result[0]*np.exp(-0.5*((fine_x - result[1])/result[2])**2)
+        
+        #peaks = find_peaks(binned, height=0.95*result[0])
 
-        is_double = len(peaks[0])>1
+        cross = np.diff(np.sign(binned - 0.5*np.max(result[0])))
+        cross[ cross<0] = 0
+        cross = np.argwhere(cross)
+        peaks = len(cross)
+        
+
+        #is_double = len(peaks[0])>1
+        is_double = peaks>1
         if is_double or result[0]<50:
             color='red'
         else :
@@ -173,17 +183,21 @@ def process(filename, reference_time = -1, docfd=False):
         else:
             offset_map[unique_id] = np.nan
             sigma_map[unique_id] = np.nan
-            hits_map[unique_id] = np.nan 
-            print("Bad fit")
+            hits_map[unique_id] = np.nan
+            if is_double:
+                print("double", peaks) #, peaks[1]["peak_heights"] )
+            else:
+                print("Bad fit")
 
         axes[irow][i_column].plot(fine_x, fine_y, label="Fit", color=color)
         axes[irow][i_column].stairs(binned ,bins, label="Data")
         axes[irow][i_column].set_ylim([0, 1.1*np.max(binned)])
+        axes[irow][i_column].set_xlim([fine_x.min(), fine_x.max()])
         if is_double:
             axes[irow][i_column].vlines([ result[1]-16, result[1]-8, result[1]+8, result[1]+16], 0, result[0], color='red', alpha=0.5, ls='--')
         
     
-    if one_good:
+    if one_good or int(card_id)==131:
         plt.savefig("./hit_plots/card{}.png".format(card_id), dpi=400)
         plt.close()
     return offset_map, sigma_map, hits_map, reference_time
@@ -215,7 +229,7 @@ if __name__=="__main__":
         for uqid in offsets.keys():
             pos = uqid % 19
             slot = uqid // 19 
-            if int(slot)==49 and int(pos) ==0:
+            if int(slot)==39 and int(pos) ==0: #formerly 49
                 ref_time = offsets[uqid]
             who = np.logical_and(new_df["mPMT_slot_id"] == slot, new_df["Chan"]==pos)
             new_df.loc[who, "calc_offset"] = offsets[uqid]
